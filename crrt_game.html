@@ -1209,7 +1209,7 @@ document.getElementById('retryChallengeBtn').addEventListener('click', () => {
   startChallenge();
 });
 document.getElementById('resultsHomeBtn').addEventListener('click', () => {
-  location.href = 'crrt_login.html';
+  location.href = 'index.html';
 });
 
 document.getElementById('backBtn').addEventListener('click', () => {
@@ -1219,7 +1219,7 @@ document.getElementById('backBtn').addEventListener('click', () => {
     const p = new URLSearchParams();
     const nm = getParam('name'); if(nm) p.set('name', nm);
     p.set('view', currentViewMode());
-    location.href = 'crrt_login.html?' + p.toString();
+    location.href = 'index.html?' + p.toString();
   }
 });
 

@@ -446,6 +446,7 @@ const alarmDefs = {
         resolveText:'先連絡洗腎室護理師評估是否可調降血液流速至最低 100 mL/min（待血壓改善後需調回 150-200 mL/min），讓機器先運轉，避免套組凝血。處理完畢後按面板【繼續】鍵，後續仍須處理血壓，請醫師評估調降脫水量、調整升壓藥物、輸血或輸液，提升病人血液容積。',
         finalSequence:[
           { type:'button', which:'flow' },
+          { type:'confirm', label:'已調降流速至 100 mL/min' },
           { type:'button', which:'continue' },
           { type:'confirm', label:'處理血壓，請醫師評估調降脫水量，調整升壓劑、輸血或輸液，提升病人血液容積。' }
         ] }

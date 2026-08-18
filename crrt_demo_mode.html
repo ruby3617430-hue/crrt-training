@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>示範模式｜CRRT 模擬訓練系統</title>
+<title>演練模式｜CRRT 模擬訓練系統</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
@@ -52,6 +52,16 @@
   .sc-info .sc-tag{ font-size:11px; color:var(--muted); margin-top:2px; }
   .sc-status{ margin-left:auto; font-size:11px; color:var(--cyan-soft); flex-shrink:0; }
   .scenario-card.locked .sc-status{ color:var(--muted); }
+  .sc-expand{
+    flex-shrink:0; width:26px; height:26px; border-radius:8px; border:1px solid rgba(143,230,236,0.25);
+    background:rgba(255,255,255,0.06); color:var(--cyan-soft); font-size:12px; cursor:pointer; margin-left:4px;
+  }
+  .cause-list{ margin:-4px 0 10px 42px; display:flex; flex-direction:column; gap:6px; }
+  .cause-row{
+    font-size:11.5px; color:var(--muted); background:rgba(255,255,255,0.03); border:1px solid rgba(143,230,236,0.12);
+    border-radius:8px; padding:8px 12px; cursor:pointer; line-height:1.5;
+  }
+  .cause-row:hover{ border-color:rgba(32,201,214,0.4); color:#dbeaf4; }
 
   #playScreen{ display:none; }
 
@@ -83,8 +93,12 @@
   .octagon-badge{
     width:56px; height:56px;
     clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
-    border:2px solid rgba(0,0,0,0.15);
+    filter: drop-shadow(1.5px 0 0 rgba(0,0,0,0.55)) drop-shadow(-1.5px 0 0 rgba(0,0,0,0.55)) drop-shadow(0 1.5px 0 rgba(0,0,0,0.55)) drop-shadow(0 -1.5px 0 rgba(0,0,0,0.55));
   }
+  .octagon-badge.shape-triangle{ clip-path: polygon(50% 4%, 98% 96%, 2% 96%); }
+  .octagon-badge.shape-square{ clip-path: none; }
+  .octagon-badge.shape-circle{ clip-path: circle(50% at 50% 50%); }
+  .octagon-badge.shape-octagon{ clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); }
   .octagon-label{ display:none; }
   .m-body.octagon-mode{ position:relative; }
   .m-body.octagon-mode .m-left{ flex:1 1 100%; padding-right:76px; }
@@ -234,8 +248,8 @@
 <header>
   <button class="back-btn" id="backBtn">←</button>
   <div class="header-text">
-    <div class="title" id="headerTitle">示範模式</div>
-    <div class="sub" id="headerSub">導師示範模式・點選情境或隨機示範</div>
+    <div class="title" id="headerTitle">演練模式</div>
+    <div class="sub" id="headerSub">導師演練模式・點選情境或隨機示範</div>
   </div>
 </header>
 
@@ -243,7 +257,7 @@
 
   <div id="selectScreen">
     <div class="notice">
-      <b>示範模式說明：</b>內容與遊戲情境完全相同，畫面已依實際 Prismaflex 機台截圖還原。供導師挑選情境或使用「隨機示範」，
+      <b>演練模式說明：</b>內容與遊戲情境完全相同，畫面已依實際 Prismaflex 機台截圖還原。供導師挑選情境或使用「隨機示範」，
       向學員展示正確的警報排除操作流程。
     </div>
 
@@ -289,7 +303,7 @@
           <button class="m-btn mute" id="btnMute" title="靜音">🔕</button>
           <button class="m-btn release" id="btnRelease" style="display:none;">鬆開<br>管路夾</button>
           <div class="m-btn spacer"></div>
-          <button class="m-btn resume" id="btnResume" disabled>繼續</button>
+          <button class="m-btn resume" id="btnResume">繼續</button>
           <button class="m-btn" id="btnHelp">幫助</button>
         </div>
       </div>
@@ -357,17 +371,19 @@ const alarmDefs = {
       { id:'lumen', cue:'床邊觀察：使用 20mL 空針抽吸導管時感覺有阻力，懷疑 Double Lumen 前端貼附血管壁。',
         correct:'lumen', resolveText:'調整病人姿勢、Double Lumen 位置，並照會洗腎室護理師評估是否可紅藍端對調後，輸入壓恢復正常。' },
       { id:'volume', cue:'生命徵象：血壓 82/50 mmHg，懷疑病人容積不足。',
-        correct:'volume', resolveText:'請醫師評估是否需要輸血或補液後，血液端灌流改善，輸入壓回升。' },
-      { id:'flow', cue:'已排除管路/血壓/Lumen問題，檢視流速設定 200 mL/min。',
-        correct:'flow', resolveText:'請洗腎室護理師評估是否可調降血液流速後，輸入壓回到安全範圍。' }
+        correct:'volume',
+        resolveText:'先連絡洗腎室護理師評估是否可調降血液流速至最低 100 mL/min（待血壓改善後需調回 150-200 mL/min），讓機器先運轉，避免套組凝血。處理完畢後按面板【繼續】鍵，後續仍須處理血壓，請醫師評估調降脫水量、調整升壓藥物、輸血或輸液，提升病人血液容積。',
+        finalSequence:[
+          { type:'button', which:'flow' },
+          { type:'button', which:'continue' },
+          { type:'confirm', label:'處理血壓，請醫師評估調降脫水量，調整升壓劑、輸血或輸液，提升病人血液容積。' }
+        ] }
     ],
     actionOptions:[
       { id:'kink', label:'檢查輸入端管路（紅）是否被夾住或拗折，並協助排除' },
       { id:'lumen', label:'調整病人姿勢、Double Lumen 位置，或請洗腎室護理師評估是否可紅、藍端對調' },
-      { id:'volume', label:'請醫師評估是否需要輸血或補液' },
-      { id:'flow', label:'請洗腎室護理師評估是否可調降血液流速' },
-      { id:'wrong-return', label:'檢查回輸端（藍）管路是否阻塞' },
-      { id:'wrong-ignore', label:'直接按「繼續」，忽略警報繼續治療' }
+      { id:'volume', label:'先連絡洗腎室護理師評估是否可調降血液流速至最低 100 mL/min（待血壓改善後需調回 150-200 mL/min），讓機器先運轉，避免套組凝血' },
+      { id:'wrong-return', label:'檢查回輸端（藍）管路是否阻塞' }
     ]
   },
 
@@ -398,21 +414,30 @@ const alarmDefs = {
     steps:['mute','diagnose','release','resume'],
     causes:[
       { id:'kink', cue:'洗腎室護理師將 CRRT 管路與病人 Double Lumen 導管接上後，CRRT 機器開始運轉沒多久就發出警報聲。',
-        correct:'kink', resolveText:'檢查並排除回輸端管路（藍）被夾住／拗折的情形後，回輸壓逐漸下降。' },
+        correct:'kink', resolveText:'檢查並排除回輸端管路（藍）被夾住／拗折的情形後，按【鬆開管路夾】釋放壓力，確認回輸壓下降後按【繼續】，回輸壓逐漸下降。',
+        finalSequence:[ { type:'button', which:'release' }, { type:'button', which:'continue' } ] },
       { id:'clot', cue:'CRRT 機器發出警報，巡視管路時發現排氣室出現暗紅色血塊。',
-        correct:'clot', resolveText:'照會洗腎室護理師評估，若嚴重凝血已影響運作則協助更換套組後，回輸壓恢復正常。' },
+        correct:'clot', resolveText:'確認排氣室嚴重凝血已影響運作，按【停止】，處理透析導管，等待洗腎室護理師更換套組，回輸壓恢復正常。',
+        finalSequence:[
+          { type:'button', which:'stop' },
+          { type:'confirm', label:'嚴重凝血不回血，處理透析導管，等待洗腎室護理師更換套組' }
+        ] },
       { id:'lumen', cue:'用 20mL 空針反抽 Double Lumen 及生理食鹽水沖水皆不順暢。',
-        correct:'lumen', resolveText:'照會醫師評估更換 Double Lumen 導管後，回輸壓恢復正常。' },
+        correct:'lumen', resolveText:'確診 Double Lumen 不順暢，按【停止】，評估管路阻塞無法回血，處理透析導管，等待醫師更換 Double Lumen 導管，回輸壓恢復正常。',
+        finalSequence:[
+          { type:'button', which:'stop' },
+          { type:'confirm', label:'評估管路阻塞無法回血，處理透析導管，等待醫師更換 Double Lumen 導管' }
+        ] },
       { id:'cough', cue:'協助抽痰時病人劇烈咳嗽後警報。',
-        correct:'cough', resolveText:'待病人平靜後，按【鬆開管路夾】評估壓力是否下降，確認下降後再按【繼續】，回輸壓回到安全範圍。' }
+        correct:'cough', resolveText:'待病人平靜後，按【鬆開管路夾】評估壓力是否下降（面板回輸壓箭頭回復至灰色區間顯示已下降），確認下降後按【繼續】，回輸壓回到安全範圍。',
+        finalSequence:[ { type:'button', which:'release' }, { type:'button', which:'continue' } ] }
     ],
     actionOptions:[
       { id:'kink', label:'檢查回輸端管路（藍）是否被夾住或拗折，並協助排除' },
       { id:'clot', label:'若排氣室嚴重凝血已影響運作，請洗腎室護理師協助更換套組' },
-      { id:'lumen', label:'請醫師評估是否需更換 Double Lumen 導管' },
-      { id:'cough', label:'待病人平靜後，按【鬆開管路夾】評估壓力是否下降，確認下降後再按【繼續】' },
-      { id:'wrong-input', label:'檢查輸入端（紅）管路是否阻塞' },
-      { id:'wrong-ignore', label:'直接按「繼續」，忽略警報繼續治療' }
+      { id:'lumen', label:'醫師評估需更換 Double Lumen 導管' },
+      { id:'cough', label:'待病人平靜後，確認回輸壓力是否下降（面板回輸壓箭頭回復至灰色區間顯示已下降）' },
+      { id:'wrong-input', label:'檢查輸入端（紅）管路是否阻塞' }
     ]
   },
 
@@ -440,18 +465,15 @@ const alarmDefs = {
     fixGauge:{ index:1, value:200 },
     steps:['mute','diagnose','resume'],
     causes:[
-      { id:'clotted', cue:'過濾器與排氣室有暗紅色凝血塊，TMP 上升，過濾器已有暗黑色血塊產生（輕度）。',
-        correct:'clotted', resolveText:'評估血液仍可回收後執行回血（將輸入端(紅端)3-way轉向N/S，待回輸端變清澈後），按【停止】更換套組，TMP 恢復正常。' },
       { id:'severe-clot', cue:'巡視管路時發現過濾器與排氣室出現暗紅色凝血塊，TMP 持續上升，確認已凝血且管路已有血塊阻塞。',
-        correct:'severe-clot', resolveText:'血塊已阻塞、無法安全回血，故不執行回血動作，直接按【停止】並更換套組，TMP 恢復正常。' },
-      { id:'kinked', cue:'巡視發現輸入端管路拗折（無凝血）。',
-        correct:'kinked', resolveText:'調整輸入端管路拗折處，再按【繼續】，TMP 回到安全範圍。' }
+        correct:'severe-clot', resolveText:'血塊已阻塞、無法安全回血，不執行回血動作，按【停止】，處理透析導管並聯絡洗腎室護理師更換套組，TMP 恢復正常。',
+        finalSequence:[
+          { type:'button', which:'stop' },
+          { type:'confirm', label:'處理透析導管並聯絡洗腎室護理師更換套組' }
+        ] }
     ],
     actionOptions:[
-      { id:'clotted', label:'評估血液仍可回收後執行回血（將輸入端(紅端)3-way轉向N/S，待回輸端變清澈後），按【停止】更換套組' },
-      { id:'severe-clot', label:'血塊已阻塞、無法安全回血，不執行回血動作，直接按【停止】更換套組' },
-      { id:'kinked', label:'調整輸入端管路拗折處，再按【繼續】' },
-      { id:'wrong-ignore', label:'直接按「繼續」，忽略警報繼續治療' },
+      { id:'severe-clot', label:'血塊已阻塞、無法安全回血，不執行回血動作，準備更換套組' },
       { id:'wrong-force-return', label:'套組已明顯凝血阻塞，執行回血', penalty:-3 }
     ]
   },
@@ -473,18 +495,17 @@ const alarmDefs = {
     hasRelease:false,
     steps:['mute','diagnose','resume'],
     causes:[
-      { id:'purple', color:'#a31f6b', cue:'畫面右上角八邊形圖示顯示紫色，提示紫色置換液袋已空。',
+      { id:'purple', color:'#a31f6b', shape:'octagon', cue:'',
         correct:'purple', resolveText:'打開紫色磅秤，關閉液袋管夾、取下空液袋，接上新液袋後鬆開管夾並關閉磅秤，按【繼續】，警示解除。' },
-      { id:'white', color:'#ffffff', cue:'畫面右上角八邊形圖示顯示白色，提示白色置換液袋已空。',
+      { id:'white', color:'#ffffff', shape:'triangle', cue:'',
         correct:'white', resolveText:'打開白色磅秤，關閉液袋管夾、取下空液袋，接上新液袋後鬆開管夾並關閉磅秤，按【繼續】，警示解除。' },
-      { id:'green', color:'#3ecf6e', cue:'畫面右上角八邊形圖示顯示綠色，提示綠色置換液袋已空。',
+      { id:'green', color:'#4f7942', shape:'square', cue:'',
         correct:'green', resolveText:'打開綠色磅秤，關閉液袋管夾、取下空液袋，接上新液袋後鬆開管夾並關閉磅秤，按【繼續】，警示解除。' }
     ],
     actionOptions:[
       { id:'purple', label:'打開紫色磅秤，依步驟更換置換液袋' },
       { id:'white', label:'打開白色磅秤，依步驟更換置換液袋' },
-      { id:'green', label:'打開綠色磅秤，依步驟更換置換液袋' },
-      { id:'wrong-ignore', label:'直接按「繼續」，忽略警報繼續治療' }
+      { id:'green', label:'打開綠色磅秤，依步驟更換置換液袋' }
     ]
   },
 
@@ -509,21 +530,20 @@ const alarmDefs = {
     fixGauge:null,
     steps:['mute','diagnose','resume'],
     causes:[
-      { id:'after-bag-change', color:'#a31f6b', cue:'更換完液袋後隨即發出警告。',
-        correct:'after-bag-change', resolveText:'檢視更換液袋後管夾已正確開啟、管路無拗折、液袋接頭已正確旋緊無歪斜，再按【繼續】，警示解除。' },
-      { id:'turning', color:'#ffffff', cue:'協助病人翻身後隨即發出警告，翻身時未先按【更換液袋】按鍵，管路因翻身晃動影響液體袋。',
-        correct:'turning', resolveText:'協助病人翻身前應先按【更換液袋】按鍵，盡快完成翻身後再按【繼續】，警示解除。' },
-      { id:'drain', color:'#3ecf6e', cue:'引流完廢液後隨即發出警告。',
-        correct:'drain', resolveText:'檢視廢液袋管路管夾是否正確開啟，再按【繼續】，警示解除。' },
-      { id:'moving', color:'#f2c744', cue:'協助病人翻身時挪動 CRRT 機器隨即發出警告，移動時加溫管線及液體袋有晃動情形。',
-        correct:'moving', resolveText:'移動 CRRT 機器前應先按【更換液袋】按鈕，移動後按【繼續】，並確實固定加溫管線避免懸吊於液袋上，警示解除。' }
+      { id:'after-bag-change', color:'#a31f6b', shape:'octagon', cue:'更換完液袋後隨即發出警告。',
+        correct:'after-bag-change', resolveText:'檢查紫色磅秤：檢視更換液袋後管夾已正確開啟、管路無拗折、液袋接頭已正確旋緊無歪斜，再按【繼續】，警示解除。' },
+      { id:'turning', color:'#ffffff', shape:'triangle', cue:'協助病人翻身後隨即發出警告，管路因翻身晃動影響液體袋。',
+        correct:'turning', resolveText:'檢查白色磅秤，管路因翻身晃動影響液體袋，盡快完成翻身，結束後按【繼續】，警示解除。' },
+      { id:'drain', color:'#f2c744', shape:'circle', cue:'引流完廢液後隨即發出警告。',
+        correct:'drain', resolveText:'檢查黃色磅秤：檢視廢液袋管路管夾是否正確開啟，再按【繼續】，警示解除。' },
+      { id:'moving', color:'#4f7942', shape:'square', cue:'協助病人翻身時挪動 CRRT 機器隨即發出警告，加溫管線及液體袋有晃動情形。',
+        correct:'moving', resolveText:'檢查綠色磅秤，液袋是否有晃動情形，並於挪動機器前先按【更換液袋】按鈕，挪動後確實固定加溫管線避免懸吊於液袋上，再按【繼續】，警示解除。' }
     ],
     actionOptions:[
-      { id:'after-bag-change', label:'檢視更換液袋後管夾是否正確開啟、管路無拗折、液袋接頭已正確旋緊，再按【繼續】' },
-      { id:'turning', label:'協助病人翻身前先按【更換液袋】按鍵，盡快完成翻身後再按【繼續】' },
-      { id:'drain', label:'檢視廢液袋管路管夾是否正確開啟，再按【繼續】' },
-      { id:'moving', label:'移動 CRRT 機器前先按【更換液袋】按鈕，移動後按【繼續】，並確實固定加溫管線避免懸吊於液袋上' },
-      { id:'wrong-ignore', label:'直接按「繼續」，忽略警報繼續治療' }
+      { id:'after-bag-change', label:'檢查紫色磅秤：管夾是否正確開啟、管路無拗折、液袋接頭已正確旋緊' },
+      { id:'turning', label:'檢查白色磅秤：盡快完成翻身' },
+      { id:'drain', label:'檢查黃色磅秤：廢液袋管路管夾是否正確開啟' },
+      { id:'moving', label:'檢查綠色磅秤：液袋是否有晃動情形，並於挪動機器前先按【更換液袋】按鈕，挪動後確實固定加溫管線避免懸吊於液袋上' }
     ]
   },
 
@@ -547,20 +567,21 @@ const alarmDefs = {
     hasRelease:false,
     steps:['mute','diagnose'],
     causes:[
-      { id:'leak', cue:'過濾器半透膜破裂，造成血液滲漏，確認有血液滲漏，檢視廢液管路（黃色）呈鮮紅色。',
-        correct:'leak', resolveText:'確認血液滲漏，按【停止】，不須趕血，將 Double Lumen 封管後，立即聯絡洗腎室護理師協助更換套組。' },
-      { id:'rhabdo', cue:'病人為橫紋肌溶解症患者，檢視廢液呈茶色。',
+      { id:'leak', cue:'檢查廢液管路（黃色）呈鮮紅色。',
+        correct:'leak', resolveText:'確認過濾器半透膜破裂造成血液滲漏，按【停止】，將 Double Lumen 封管並聯絡洗腎室護理師更換套組。',
+        finalSequence:[
+          { type:'button', which:'stop' },
+          { type:'confirm', label:'過濾器半透膜破裂，將 Double Lumen 封管並聯絡洗腎室護理師更換套組' }
+        ] },
+      { id:'rhabdo', cue:'檢查廢液管路（黃色）呈茶色，病人有橫紋肌溶解症病史。',
         correct:'rhabdo', resolveText:'評估屬橫紋肌溶解症之正常茶色廢液表現，按【忽略】，繼續治療並密切監控。' },
-      { id:'dirty', cue:'檢視廢液管路有髒污。',
-        correct:'dirty', resolveText:'清潔擦拭血液滲漏偵測器或廢液管路後，按【忽略】，繼續治療。' },
-      { id:'lamp', cue:'病人因低體溫使用烤燈。',
-        correct:'lamp', resolveText:'檢視烤燈是否照射到血液滲漏偵測器，調整光線位置後，按【忽略】，繼續治療。' }
+      { id:'lamp', cue:'檢查廢液管路（黃色）呈清澈，病人有使用烤燈，機器面對窗戶。',
+        correct:'lamp', resolveText:'評估烤燈位置或拉上窗簾，避免光線直接照射到機器偵測器後，按【忽略】，繼續治療。' }
     ],
     actionOptions:[
-      { id:'leak', label:'過濾器半透膜破裂造成血液滲漏，廢液管路（黃色）呈鮮紅色' },
-      { id:'rhabdo', label:'病人為橫紋肌溶解症患者，廢液呈茶色' },
-      { id:'dirty', label:'血液滲漏偵測器或廢液管路有髒污' },
-      { id:'lamp', label:'病人因低體溫使用烤燈，光線干擾偵測器' }
+      { id:'leak', label:'評估為過濾器半透膜破裂，造成血液滲漏' },
+      { id:'rhabdo', label:'評估屬橫紋肌溶解症之正常茶色廢液表現' },
+      { id:'lamp', label:'評估烤燈照射或窗戶陽光干擾偵測器，需調整烤燈位置或拉上窗簾' }
     ]
   }
 };
@@ -587,15 +608,47 @@ scenarios.forEach((s, i) => {
       <div class="sc-title">${title}</div>
       <div class="sc-tag">${tag}</div>
     </div>
-    <div class="sc-status">${s.unlocked ? '開始 →' : '🔒 未開放'}</div>`;
-  if(s.unlocked) card.addEventListener('click', () => startScenario(s.id));
+    <div class="sc-status">${s.unlocked ? '開始 →' : '🔒 未開放'}</div>
+    ${s.unlocked && def && def.causes.length > 1 ? '<button class="sc-expand" title="挑選特定情境">▾</button>' : ''}`;
+  if(s.unlocked) card.addEventListener('click', (ev) => {
+    if(ev.target.closest('.sc-expand')) return;
+    startScenario(s.id);
+  });
   grid.appendChild(card);
+
+  if(s.unlocked && def && def.causes.length > 1){
+    const causeList = document.createElement('div');
+    causeList.className = 'cause-list';
+    causeList.style.display = 'none';
+    def.causes.forEach(c => {
+      const opt = def.actionOptions.find(o => o.id === c.id);
+      const label = c.cue || (opt ? opt.label : c.id);
+      const row = document.createElement('div');
+      row.className = 'cause-row';
+      row.textContent = label;
+      row.addEventListener('click', () => startScenario(s.id, c.id));
+      causeList.appendChild(row);
+    });
+    grid.appendChild(causeList);
+    card.querySelector('.sc-expand').addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const showing = causeList.style.display === 'block';
+      causeList.style.display = showing ? 'none' : 'block';
+      ev.target.textContent = showing ? '▾' : '▴';
+    });
+  }
 });
 
+let lastRandomDemoId = null;
 document.getElementById('randomDemoBtn').addEventListener('click', () => {
   const unlocked = scenarios.filter(s => s.unlocked);
   if(unlocked.length === 0) return;
-  const pick = unlocked[Math.floor(Math.random() * unlocked.length)];
+  let pool = unlocked;
+  if(unlocked.length > 1){
+    pool = unlocked.filter(s => s.id !== lastRandomDemoId);
+  }
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  lastRandomDemoId = pick.id;
   startScenario(pick.id);
 });
 document.getElementById('toGameBtn').addEventListener('click', () => {
@@ -728,7 +781,11 @@ function renderMachineScreen(def){
 /* ===================== 遊戲狀態 ===================== */
 let currentAlarmId = null, currentDef = null, currentCause = null;
 let stepIndex = 0, mistakes = 0, score = 0;
-let awaitingButton = null; // used by the blood-leak custom flow: null | 'stop' | 'ignore'
+let phase = 'mute'; // 'mute' | 'diagnose' | 'sequence'
+let currentSequence = [];
+let seqIndex = 0;
+const BTN_PENALTY = { stop:-3, continue:-2, ignore:-2, release:-2, flow:-2 };
+const BTN_LABEL = { stop:'停止', continue:'繼續', ignore:'忽略', release:'鬆開管路夾', flow:'流速設定' };
 
 const mBanner = document.getElementById('mBanner');
 const btnMute = document.getElementById('btnMute');
@@ -775,26 +832,33 @@ function updateScoreDisplay(delta){
   if(delta < 0) el.classList.add('down');
 }
 
-function startScenario(id){
+function startScenario(id, forcedCauseId){
   document.getElementById('selectScreen').style.display = 'none';
   document.getElementById('playScreen').style.display = 'block';
-  headerTitle.textContent = '示範中';
+  headerTitle.textContent = '演練中';
   headerSub.textContent = '導師操作示範，請學員觀察步驟順序';
 
   currentAlarmId = id;
   currentDef = alarmDefs[id];
-  currentCause = currentDef.causes[Math.floor(Math.random() * currentDef.causes.length)];
-  stepIndex = 0; mistakes = 0; score = 0; updateScoreDisplay(0);
-  awaitingButton = null;
+  currentCause = forcedCauseId
+    ? currentDef.causes.find(c => c.id === forcedCauseId)
+    : currentDef.causes[Math.floor(Math.random() * currentDef.causes.length)];
+  mistakes = 0; score = 0; updateScoreDisplay(0);
+  phase = 'mute';
+  currentSequence = [];
+  seqIndex = 0;
   btnResume.textContent = currentDef.resumeLabel || '繼續';
 
   renderMachineScreen(currentDef);
   if(currentDef.rightPanelType === 'octagon'){
     const badgeColor = currentCause.color || currentDef.badgeColor;
-    if(badgeColor) document.getElementById('octagonBadge').style.background = badgeColor;
+    const badgeEl = document.getElementById('octagonBadge');
+    if(badgeColor) badgeEl.style.background = badgeColor;
+    badgeEl.classList.remove('shape-triangle','shape-square','shape-circle','shape-octagon');
+    const badgeShape = currentCause.shape || currentDef.badgeShape || 'octagon';
+    badgeEl.classList.add('shape-' + badgeShape);
   }
   mBanner.classList.add('pulsing'); mBanner.classList.remove('silenced');
-  btnResume.disabled = true;
   successCard.style.display = 'none';
   const manualBtn = document.getElementById('manualPlayBtn');
   manualBtn.style.display = 'none';
@@ -814,23 +878,24 @@ document.getElementById('manualPlayBtn').addEventListener('click', () => {
   activeAudio.play().then(() => { document.getElementById('manualPlayBtn').style.display = 'none'; }).catch(()=>{});
 });
 
-function currentStepType(){ return currentDef.steps[stepIndex]; }
+function defaultSequence(){
+  return [{ type:'button', which: (currentDef.resumeLabel === '忽略') ? 'ignore' : 'continue' }];
+}
 
 function renderStep(){
   stepContent.style.display = 'block';
   successCard.style.display = 'none';
-  const type = currentStepType();
-  const totalSteps = currentDef.steps.length;
 
-  if(type === 'mute'){
-    tpLabel.textContent = `STEP ${stepIndex+1}/${totalSteps}．請先點擊機台上的靜音鍵（🔕）`;
+  if(phase === 'mute'){
+    tpLabel.textContent = 'STEP 1．請先點擊機台上的靜音鍵（🔕）';
     stepContent.innerHTML = `<div class="cue-card">警報響起，依實際流程，第一步一律先靜音，再進行原因排除。</div>`;
-  } else if(type === 'diagnose'){
-    tpLabel.textContent = `STEP ${stepIndex+1}/${totalSteps}．找出並排除原因`;
+  } else if(phase === 'diagnose'){
+    tpLabel.textContent = 'STEP 2．找出並排除原因';
     const opts = shuffle(currentDef.actionOptions);
-    stepContent.innerHTML = `
-      <div class="cue-card"><b>情境提示：</b>${currentCause.cue}<br><br>請根據情境選擇正確的排除措施：</div>
-      <div id="optWrap"></div>`;
+    const cueHtml = currentCause.cue
+      ? `<div class="cue-card"><b>情境提示：</b>${currentCause.cue}<br><br>請根據情境選擇正確的排除措施：</div>`
+      : '';
+    stepContent.innerHTML = cueHtml + '<div id="optWrap"></div>';
     const wrap = document.getElementById('optWrap');
     opts.forEach(o => {
       const b = document.createElement('button');
@@ -839,17 +904,66 @@ function renderStep(){
       b.addEventListener('click', () => handleAction(o, b));
       wrap.appendChild(b);
     });
-  } else if(type === 'release'){
-    tpLabel.textContent = `STEP ${stepIndex+1}/${totalSteps}．釋放管路壓力`;
-    stepContent.innerHTML = `<div class="cue-card">原因已排除，請點擊機台上的【鬆開管路夾】釋放回輸管中過多的壓力。</div>`;
-  } else if(type === 'resume'){
-    if(currentDef.autoResume){
-      completeScenario();
-      return;
-    }
-    tpLabel.textContent = `STEP ${stepIndex+1}/${totalSteps}．確認畫面`;
-    stepContent.innerHTML = `<div class="cue-card">壓力已回升至安全範圍，請點擊機台上的【繼續】鍵清除警報。</div>`;
-    btnResume.disabled = false;
+  } else if(phase === 'sequence'){
+    renderSequenceHint();
+  }
+}
+
+function nextExpectedButtonLabel(){
+  const item = currentSequence[seqIndex];
+  if(!item || item.type !== 'button') return '';
+  return BTN_LABEL[item.which];
+}
+
+function renderSequenceHint(){
+  const item = currentSequence[seqIndex];
+  if(!item) { stepContent.innerHTML = ''; return; }
+  if(item.type === 'button'){
+    tpLabel.textContent = `STEP 3．完成處置`;
+    stepContent.innerHTML = `<div class="cue-card">原因已排除，請點擊機台上的【${BTN_LABEL[item.which]}】鍵。</div>`;
+  } else if(item.type === 'confirm'){
+    tpLabel.textContent = `STEP 3．完成處置`;
+    stepContent.innerHTML = '<div class="cue-card">請先完成以下處置：</div><div id="confirmWrap"></div>';
+    const wrap = document.getElementById('confirmWrap');
+    const b = document.createElement('button');
+    b.className = 'btn-device';
+    b.textContent = item.label;
+    b.addEventListener('click', () => {
+      b.classList.add('correct-flash');
+      b.disabled = true;
+      seqIndex++;
+      setTimeout(() => advanceSequence(), 400);
+    });
+    wrap.appendChild(b);
+  }
+}
+
+function advanceSequence(){
+  if(seqIndex >= currentSequence.length){
+    completeScenario();
+    return;
+  }
+  renderSequenceHint();
+}
+
+function pressRealButton(which){
+  if(phase !== 'sequence' || seqIndex >= currentSequence.length ||
+     currentSequence[seqIndex].type !== 'button' || currentSequence[seqIndex].which !== which){
+    applyButtonPenalty(which);
+    return;
+  }
+  seqIndex++;
+  advanceSequence();
+}
+
+function applyButtonPenalty(which){
+  const p = BTN_PENALTY[which];
+  score += p; updateScoreDisplay(p);
+  mistakes++;
+  if(p <= -3){
+    showToast(`🚫 嚴禁按下【${BTN_LABEL[which]}】排除警報 (${p}分)`, 'bad');
+  } else {
+    showToast(`⚠ 尚未完成正確流程就按下【${BTN_LABEL[which]}】 (${p}分)`, 'bad');
   }
 }
 
@@ -858,32 +972,6 @@ function completeScenario(){
   successCard.style.display = 'block';
   document.getElementById('successText').textContent =
     `本次情境原因：${currentCause.resolveText}（共 ${mistakes} 次誤選，本次得分：${score} 分）`;
-}
-
-function showBloodLeakFinalStep(){
-  tpLabel.textContent = 'STEP 3/3．完成處置';
-  if(currentCause.correct === 'leak'){
-    stepContent.innerHTML = `
-      <div class="cue-card">確認為血液滲漏，請先完成以下處置：</div>
-      <div id="confirmWrap"></div>
-      <div class="cue-card" id="stopPrompt" style="display:none; margin-top:10px;">請點擊機台上的【停止】鍵。</div>`;
-    const wrap = document.getElementById('confirmWrap');
-    const b = document.createElement('button');
-    b.className = 'btn-device';
-    b.textContent = '將 Double Lumen 封管，並立即聯絡洗腎室護理師協助更換套組';
-    b.addEventListener('click', () => {
-      b.classList.add('correct-flash');
-      b.disabled = true;
-      document.getElementById('stopPrompt').style.display = 'block';
-      awaitingButton = 'stop';
-      showToast('已完成確認，請點擊機台上的【停止】鍵', 'good');
-    });
-    wrap.appendChild(b);
-  } else {
-    stepContent.innerHTML = `<div class="cue-card">請點擊機台上的【忽略】鍵，繼續治療並密切監控。</div>`;
-    awaitingButton = 'ignore';
-    btnResume.disabled = false;
-  }
 }
 
 function refreshGaugeValue(index, newValue){
@@ -905,75 +993,50 @@ function handleAction(option, btnEl){
     score += 1; updateScoreDisplay(1);
     showToast('✅ 措施正確 +1', 'good');
     setTimeout(() => {
-      if(currentAlarmId === 'blood-leak'){
-        showBloodLeakFinalStep();
-      } else {
-        stepIndex++;
-        renderStep();
-      }
+      currentSequence = currentCause.finalSequence || defaultSequence();
+      seqIndex = 0;
+      phase = 'sequence';
+      renderStep();
     }, 700);
   } else {
     mistakes++;
     btnEl.classList.add('wrong-flash');
     btnEl.disabled = true;
-    const penalty = option.penalty !== undefined ? option.penalty : (option.id === 'wrong-ignore' ? -2 : -1);
+    const penalty = option.penalty !== undefined ? option.penalty : -1;
     score += penalty; updateScoreDisplay(penalty);
     if(penalty <= -3){
       showToast(`🚫 危險操作，可能造成栓塞或治療併發症 (${penalty}分)`, 'bad');
-    } else if(option.id === 'wrong-ignore'){
-      showToast(`⚠ 未排除原因即恢復運轉，可能造成治療中斷或病人不適 (${penalty}分)`, 'bad');
     } else {
-      showToast(`此措施未改善壓力，請重新評估其他可能原因 (${penalty}分)`, 'bad');
+      showToast(`此措施未改善狀況，請重新評估其他可能原因 (${penalty}分)`, 'bad');
     }
   }
 }
 
 /* ===================== 機台按鍵互動 ===================== */
 btnMute.addEventListener('click', () => {
-  if(currentStepType() !== 'mute') return;
+  if(phase !== 'mute') return;
   mBanner.classList.remove('pulsing');
   mBanner.classList.add('silenced');
   stopActiveAudio(true);
   soundHint.style.display = 'none';
   score += 1; updateScoreDisplay(1);
-  stepIndex++;
+  phase = 'diagnose';
   renderStep();
   showToast('✅ 正確按下靜音 +1，請找出並排除原因', 'good');
 });
 
-btnRelease.addEventListener('click', () => {
-  if(currentStepType() === 'release'){
-    stepIndex++;
-    renderStep();
-    showToast('已釋放管路壓力，請確認畫面後按繼續', 'good');
+btnRelease.addEventListener('click', () => pressRealButton('release'));
+btnResume.addEventListener('click', () => pressRealButton(currentDef.resumeLabel === '忽略' ? 'ignore' : 'continue'));
+document.getElementById('btnStop').addEventListener('click', () => pressRealButton('stop'));
+document.getElementById('btnFlow').addEventListener('click', () => {
+  const expected = currentSequence[seqIndex];
+  if(phase === 'sequence' && expected && expected.type === 'button' && expected.which === 'flow'){
+    pressRealButton('flow');
   } else {
-    score -= 2; updateScoreDisplay(-2);
-    showToast('⚠ 尚未排除原因就鬆開管路夾，不符合正確流程 (-2分)', 'bad');
+    showToast('此按鍵僅供畫面對照，本情境訓練重點不需使用');
   }
 });
-
-btnResume.addEventListener('click', () => {
-  if(currentAlarmId === 'blood-leak'){
-    if(awaitingButton === 'ignore'){
-      awaitingButton = null;
-      completeScenario();
-    }
-    return;
-  }
-  if(currentStepType() !== 'resume' || btnResume.disabled) return;
-  completeScenario();
-});
-
-document.getElementById('btnStop').addEventListener('click', () => {
-  if(currentAlarmId === 'blood-leak' && awaitingButton === 'stop'){
-    awaitingButton = null;
-    completeScenario();
-    return;
-  }
-  score -= 3; updateScoreDisplay(-3);
-  showToast('🚫 嚴禁按下停止鍵排除警報！停止鍵僅用於緊急終止治療 (-3分)', 'bad');
-});
-['btnFlow','btnHelp','btnCheckAlarm'].forEach(id => {
+['btnHelp','btnCheckAlarm'].forEach(id => {
   document.getElementById(id).addEventListener('click', () => showToast('此按鍵僅供畫面對照，本情境訓練重點不需使用'));
 });
 
@@ -982,8 +1045,8 @@ document.getElementById('toSelectBtn').addEventListener('click', () => {
   stopActiveAudio();
   document.getElementById('playScreen').style.display = 'none';
   document.getElementById('selectScreen').style.display = 'block';
-  headerTitle.textContent = '示範模式';
-  headerSub.textContent = '導師示範模式・點選情境或隨機示範';
+  headerTitle.textContent = '演練模式';
+  headerSub.textContent = '導師演練模式・點選情境或隨機示範';
 });
 
 /* ===================== Toast / Nav ===================== */
@@ -1010,7 +1073,7 @@ document.getElementById('backBtn').addEventListener('click', () => {
   const params = new URLSearchParams(location.search);
   const name = params.get('name');
   if(name){
-    headerSub.textContent = `歡迎，${name}！導師示範模式・點選情境或隨機示範`;
+    headerSub.textContent = `歡迎，${name}！導師演練模式・點選情境或隨機示範`;
   }
 })();
 </script>

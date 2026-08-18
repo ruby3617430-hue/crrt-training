@@ -6,6 +6,7 @@
 ============================================================ -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyA6O2REvtIqMoqZzeTGmaWFobirWVqUXmY",
@@ -17,6 +18,7 @@
   };
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
+  const auth = firebase.auth();
 </script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -91,6 +93,40 @@
   .rank-score{ font-size:19px; font-weight:900; color:var(--cyan-accent); font-family:'Share Tech Mono',monospace; flex-shrink:0; }
   .rank-chevron{ color:var(--muted); font-size:14px; flex-shrink:0; transition:transform .2s; }
   .rank-row.expanded .rank-chevron{ transform:rotate(90deg); }
+  .delete-btn{
+    flex-shrink:0; width:30px; height:30px; border-radius:8px; border:1px solid rgba(229,72,77,0.3);
+    background:rgba(229,72,77,0.08); color:var(--alarm); font-size:14px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .delete-btn:hover{ background:rgba(229,72,77,0.2); }
+
+  .auth-btn{
+    margin-left:auto; font-family:inherit; font-size:11.5px; font-weight:700; color:var(--cyan-soft);
+    background:rgba(255,255,255,0.06); border:1px solid rgba(143,230,236,0.25); border-radius:20px;
+    padding:8px 12px; cursor:pointer; flex-shrink:0; white-space:nowrap;
+  }
+  .auth-btn.logged-in{ color:var(--ok); border-color:rgba(57,201,143,0.4); background:rgba(57,201,143,0.1); }
+
+  .login-panel{
+    position:fixed; inset:0; z-index:50; background:rgba(4,12,24,0.75);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .login-box{
+    background:var(--navy-mid); border:1px solid rgba(143,230,236,0.25); border-radius:16px;
+    padding:22px; width:100%; max-width:340px;
+  }
+  .login-title{ font-size:15px; font-weight:900; margin-bottom:14px; text-align:center; }
+  .login-box input{
+    width:100%; padding:11px 14px; border-radius:10px; border:1px solid rgba(143,230,236,0.2);
+    background:rgba(255,255,255,0.05); color:#fff; font-size:13px; font-family:inherit; margin-bottom:10px;
+  }
+  .login-error{ font-size:11.5px; color:var(--alarm); min-height:16px; margin-bottom:8px; text-align:center; }
+  .login-actions{ display:flex; gap:8px; }
+  .login-actions button{
+    flex:1; font-family:inherit; font-weight:700; font-size:13px; padding:11px; border-radius:10px; border:none; cursor:pointer;
+  }
+  #loginSubmitBtn{ background:var(--cyan-accent); color:var(--navy-deep); }
+  #loginCancelBtn{ background:rgba(255,255,255,0.08); color:#fff; border:1px solid rgba(143,230,236,0.25); }
 
   .rank-detail{ display:none; padding:0 16px 14px 62px; margin-top:-10px; }
   .rank-detail.show{ display:block; }
@@ -125,8 +161,22 @@
     <div class="title">排行榜</div>
     <div class="sub">正式挑戰成績・依總分排序</div>
   </div>
+  <button class="auth-btn" id="authBtn">🔑 老師登入</button>
   <button class="refresh-btn" id="refreshBtn">↻ 重新整理</button>
 </header>
+
+<div class="login-panel" id="loginPanel" style="display:none;">
+  <div class="login-box">
+    <div class="login-title">老師登入</div>
+    <input type="email" id="loginEmail" placeholder="Email">
+    <input type="password" id="loginPassword" placeholder="密碼">
+    <div class="login-error" id="loginError"></div>
+    <div class="login-actions">
+      <button id="loginSubmitBtn">登入</button>
+      <button id="loginCancelBtn">取消</button>
+    </div>
+  </div>
+</div>
 
 <main>
   <div class="filter-bar" id="filterBar" style="display:none;">
@@ -146,6 +196,53 @@
   const filterInput = document.getElementById('filterInput');
 
   let allEntries = [];
+  let isTeacherLoggedIn = false;
+
+  const authBtn = document.getElementById('authBtn');
+  const loginPanel = document.getElementById('loginPanel');
+  const loginEmail = document.getElementById('loginEmail');
+  const loginPassword = document.getElementById('loginPassword');
+  const loginError = document.getElementById('loginError');
+
+  authBtn.addEventListener('click', () => {
+    if(isTeacherLoggedIn){
+      auth.signOut();
+    } else {
+      loginError.textContent = '';
+      loginEmail.value = '';
+      loginPassword.value = '';
+      loginPanel.style.display = 'flex';
+      loginEmail.focus();
+    }
+  });
+  document.getElementById('loginCancelBtn').addEventListener('click', () => {
+    loginPanel.style.display = 'none';
+  });
+  document.getElementById('loginSubmitBtn').addEventListener('click', doLogin);
+  loginPassword.addEventListener('keydown', (e) => { if(e.key === 'Enter') doLogin(); });
+
+  async function doLogin(){
+    loginError.textContent = '';
+    const email = loginEmail.value.trim();
+    const password = loginPassword.value;
+    if(!email || !password){
+      loginError.textContent = '請輸入 Email 與密碼。';
+      return;
+    }
+    try {
+      await auth.signInWithEmailAndPassword(email, password);
+      loginPanel.style.display = 'none';
+    } catch(e){
+      loginError.textContent = '登入失敗，請確認帳號密碼是否正確。';
+    }
+  }
+
+  auth.onAuthStateChanged((user) => {
+    isTeacherLoggedIn = !!user;
+    authBtn.textContent = isTeacherLoggedIn ? `👤 ${user.email}（登出）` : '🔑 老師登入';
+    authBtn.classList.toggle('logged-in', isTeacherLoggedIn);
+    renderList(filterInput.value.trim());
+  });
 
   backBtn.addEventListener('click', () => {
     const params = new URLSearchParams(location.search);
@@ -169,7 +266,7 @@
     try {
       const snapshot = await db.collection('leaderboard').orderBy('totalScore', 'desc').get();
       const entries = [];
-      snapshot.forEach(doc => entries.push(doc.data()));
+      snapshot.forEach(doc => entries.push({ ...doc.data(), _id: doc.id }));
       allEntries = entries;
       filterBar.style.display = entries.length > 5 ? 'flex' : 'none';
       renderList('');
@@ -205,6 +302,7 @@
           <div class="rn-meta">${fmtTime(entry.timestamp)} ・ 共 ${(entry.rounds||[]).length} 關</div>
         </div>
         <div class="rank-score">${entry.totalScore ?? 0}</div>
+        ${isTeacherLoggedIn ? '<button class="delete-btn" title="刪除這筆紀錄">🗑</button>' : ''}
         <div class="rank-chevron">▶</div>`;
       const detail = document.createElement('div');
       detail.className = 'rank-detail';
@@ -213,6 +311,19 @@
         const showing = detail.classList.toggle('show');
         row.classList.toggle('expanded', showing);
       });
+      const delBtn = row.querySelector('.delete-btn');
+      if(delBtn){
+        delBtn.addEventListener('click', async (ev) => {
+          ev.stopPropagation();
+          if(!confirm(`確定要刪除「${entry.name || '未具名學員'}」這筆成績嗎？此動作無法復原。`)) return;
+          try {
+            await db.collection('leaderboard').doc(entry._id).delete();
+            loadLeaderboard();
+          } catch(e){
+            alert('刪除失敗：' + (e && e.message ? e.message : '未知錯誤'));
+          }
+        });
+      }
       content.appendChild(row);
       content.appendChild(detail);
     });

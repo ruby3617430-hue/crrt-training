@@ -247,7 +247,7 @@
   backBtn.addEventListener('click', () => {
     const params = new URLSearchParams(location.search);
     const name = params.get('name');
-    location.href = 'index.html' + (name ? ('?name=' + encodeURIComponent(name)) : '');
+    location.href = 'crrt_login.html' + (name ? ('?name=' + encodeURIComponent(name)) : '');
   });
   refreshBtn.addEventListener('click', loadLeaderboard);
   filterInput.addEventListener('input', () => renderList(filterInput.value.trim()));

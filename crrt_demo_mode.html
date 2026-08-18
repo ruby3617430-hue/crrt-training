@@ -372,10 +372,10 @@ const alarmDefs = {
         correct:'lumen', resolveText:'調整病人姿勢、Double Lumen 位置，並照會洗腎室護理師評估是否可紅藍端對調後，輸入壓恢復正常。' },
       { id:'volume', cue:'生命徵象：血壓 82/50 mmHg，懷疑病人容積不足。',
         correct:'volume',
-        resolveText:'先連絡洗腎室護理師評估是否可調降血液流速至最低 100 mL/min（待血壓改善後需調回 150-200 mL/min），讓機器先運轉，避免套組凝血。處理完畢後按面板【繼續】鍵，後續仍須處理血壓，請醫師評估調降脫水量、調整升壓藥物、輸血或輸液，提升病人血液容積。',
+        resolveText:'先連絡洗腎室護理師評估是否可調降血液流速至最低 100 ml/min（待血壓改善後需調回 150-200 ml/min），讓機器先運轉，避免套組凝血。處理完畢後按面板【繼續】鍵，後續仍須處理血壓，請醫師評估調降脫水量、調整升壓藥物、輸血或輸液，提升病人血液容積。',
         finalSequence:[
           { type:'button', which:'flow' },
-          { type:'confirm', label:'已調降流速至 100 mL/min' },
+          { type:'confirm', label:'已調降流速至 100 ml/min' },
           { type:'button', which:'continue' },
           { type:'confirm', label:'處理血壓，請醫師評估調降脫水量，調整升壓劑、輸血或輸液，提升病人血液容積。' }
         ] }
@@ -383,7 +383,7 @@ const alarmDefs = {
     actionOptions:[
       { id:'kink', label:'檢查輸入端管路（紅）是否被夾住或拗折，並協助排除' },
       { id:'lumen', label:'調整病人姿勢、Double Lumen 位置，或請洗腎室護理師評估是否可紅、藍端對調' },
-      { id:'volume', label:'先連絡洗腎室護理師評估是否可調降血液流速至最低 100 mL/min（待血壓改善後需調回 150-200 mL/min），讓機器先運轉，避免套組凝血' },
+      { id:'volume', label:'先連絡洗腎室護理師評估是否可調降血液流速至最低 100 ml/min（待血壓改善後需調回 150-200 ml/min），讓機器先運轉，避免套組凝血' },
       { id:'wrong-return', label:'檢查回輸端（藍）管路是否阻塞' }
     ]
   },
@@ -1065,7 +1065,7 @@ document.getElementById('backBtn').addEventListener('click', () => {
     const p = new URLSearchParams();
     const nm = getParam('name'); if(nm) p.set('name', nm);
     p.set('view', currentViewMode());
-    location.href = 'index.html?' + p.toString();
+    location.href = 'crrt_login.html?' + p.toString();
   }
 });
 

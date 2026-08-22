@@ -20,6 +20,8 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 </script>
+<script src="alarm-config.js"></script>
+<script src="session-store.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>遊戲情境｜CRRT 模擬訓練系統</title>
@@ -217,6 +219,9 @@
   }
   .challenge-title{ font-size:16px; font-weight:900; margin-bottom:6px; }
   .challenge-desc{ font-size:12px; color:var(--cyan-soft); line-height:1.7; margin-bottom:14px; }
+  .challenge-status{ font-size:11.5px; line-height:1.6; margin-bottom:10px; padding:8px 10px; border-radius:8px; }
+  .challenge-status.blocked{ background:rgba(229,72,77,0.12); color:#f5b9bc; border:1px solid rgba(229,72,77,0.3); }
+  .challenge-status.ready{ background:rgba(57,201,143,0.1); color:#9de8c8; border:1px solid rgba(57,201,143,0.3); }
   .challenge-btn{
     width:100%; font-family:inherit; font-size:14.5px; font-weight:900; letter-spacing:0.5px;
     padding:14px; border-radius:12px; border:none; cursor:pointer; margin-bottom:8px;
@@ -312,7 +317,8 @@
   <div id="selectScreen">
     <div class="challenge-card">
       <div class="challenge-title">🏆 正式挑戰</div>
-      <div class="challenge-desc">隨機抽取 3 關警報，每關限時 60 秒，依總分排行。結束後可提交成績到排行榜。</div>
+      <div class="challenge-desc" id="challengeDesc">依講師本梯次設定的題數與時限進行，結束後可提交成績到排行榜。</div>
+      <div class="challenge-status" id="challengeStatus" style="display:none;"></div>
       <button class="challenge-btn" id="startChallengeBtn">開始正式挑戰 →</button>
       <button class="leaderboard-link" id="toLeaderboardBtn">🏅 查看排行榜</button>
     </div>
@@ -411,261 +417,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-/* ===================== 警報情境資料 ===================== */
-const alarmDefs = {
-  'access-low': {
-    title:'警告：輸入壓極度負值', tag:'Access Pressure Low ｜已核對機台實拍畫面',
-    date:'04/December/17', time:'13:50',
-    instructions:{
-      selfclear:'無法完成自我清除。', pre:null,
-      actions:[
-        '確認輸入管未被夾住，亦未因病人行動而有拗折或被阻礙。',
-        '根據導管大小評估血流；如有需要，請按【流速設定】降低血液流速。',
-        '輸入壓回復正常後，請按【繼續】清除警報。'
-      ],
-      otherCauses:null,
-      help:'請參閱 [幫助]，了解更多疑難排解及其他可能原因。'
-    },
-    gauges:[
-      { name:'輸入', value:-333, min:-250, max:450, redLeft:-216, redRight:300 },
-      { name:'過濾器', value:2, min:-450, max:450, redLeft:10, redRight:430 },
-      { name:'廢液', value:-16, min:-500, max:500 },
-      { name:'回輸', value:20, min:10, max:350, redLeft:25, redRight:200 }
-    ],
-    metrics:{ drop:-3, tmp:-9 },
-    hasRelease:false,
-    fixGauge:{ index:0, value:-95 },
-    steps:['mute','diagnose','resume'],
-    causes:[
-      { id:'kink', cue:'剛協助病人翻身，拉起床欄時夾到輸入端管路（紅）。',
-        correct:'kink', resolveText:'檢查並排除輸入端管路（紅）被夾住／拗折的情形後，輸入壓逐漸回升。' },
-      { id:'lumen', cue:'床邊觀察：使用 20mL 空針抽吸導管時感覺有阻力，懷疑 Double Lumen 前端貼附血管壁。',
-        correct:'lumen', resolveText:'調整病人姿勢、Double Lumen 位置，並照會洗腎室護理師評估是否可紅藍端對調後，輸入壓恢復正常。' },
-      { id:'volume', cue:'生命徵象：血壓 82/50 mmHg，懷疑病人容積不足。',
-        correct:'volume',
-        resolveText:'先連絡洗腎室護理師評估是否可調降血液流速至最低 100 ml/min（待血壓改善後需調回 150-200 ml/min），讓機器先運轉，避免套組凝血。處理完畢後按面板【繼續】鍵，後續仍須處理血壓，請醫師評估調降脫水量、調整升壓藥物、輸血或輸液，提升病人血液容積。',
-        finalSequence:[
-          { type:'button', which:'flow' },
-          { type:'confirm', label:'已調降流速至 100 ml/min' },
-          { type:'button', which:'continue' },
-          { type:'confirm', label:'處理血壓，請醫師評估調降脫水量，調整升壓劑、輸血或輸液，提升病人血液容積。' }
-        ] }
-    ],
-    actionOptions:[
-      { id:'kink', label:'檢查輸入端管路（紅）是否被夾住或拗折，並協助排除' },
-      { id:'lumen', label:'調整病人姿勢、Double Lumen 位置，或請洗腎室護理師評估是否可紅、藍端對調' },
-      { id:'volume', label:'先連絡洗腎室護理師評估是否可調降血液流速至最低 100 ml/min（待血壓改善後需調回 150-200 ml/min），讓機器先運轉，避免套組凝血' },
-      { id:'wrong-return', label:'檢查回輸端（藍）管路是否阻塞' }
-    ]
-  },
-
-  'return-high': {
-    title:'警告：回輸壓極度正值', tag:'Return Pressure High ｜已核對機台實拍畫面',
-    date:'04/December/17', time:'14:21',
-    instructions:{
-      selfclear:'無法完成自我清除。', pre:'請按下列指示進行。',
-      actions:[
-        '確認回輸管未被夾住，亦未因病人行動而有拗折或被阻礙。',
-        '評估病人與導管的位置；視需要加以修正。',
-        '請按 [鬆開管路夾]，釋放回輸管中過多的壓力。',
-        '如有需要，請利用 [流速設定] 降低血液流速。',
-        '請按 [繼續]。'
-      ],
-      otherCauses:'回輸導管內有凝血，或偏移原本靜脈血管位置；病人正在移動，或有人正在搬動病人；病人正在咳嗽，或有人幫他抽痰；血液流速過高；液體屏障已潮濕。',
-      help:null
-    },
-    gauges:[
-      { name:'輸入', value:20, min:-250, max:300, redLeft:-100, redRight:150 },
-      { name:'過濾器', value:385, min:-500, max:450, redRight:430 },
-      { name:'廢液', value:383, min:-500, max:500 },
-      { name:'回輸', value:390, min:-500, max:350, redRight:300 }
-    ],
-    metrics:{ drop:-30, tmp:-14 },
-    hasRelease:true,
-    fixGauge:{ index:3, value:210 },
-    steps:['mute','diagnose','release','resume'],
-    causes:[
-      { id:'kink', cue:'洗腎室護理師將 CRRT 管路與病人 Double Lumen 導管接上後，CRRT 機器開始運轉沒多久就發出警報聲。',
-        correct:'kink', resolveText:'檢查並排除回輸端管路（藍）被夾住／拗折的情形後，按【鬆開管路夾】釋放壓力，確認回輸壓下降後按【繼續】，回輸壓逐漸下降。',
-        finalSequence:[ { type:'button', which:'release' }, { type:'button', which:'continue' } ] },
-      { id:'clot', cue:'CRRT 機器發出警報，巡視管路時發現排氣室出現暗紅色血塊。',
-        correct:'clot', resolveText:'確認排氣室嚴重凝血已影響運作，按【停止】，處理透析導管，等待洗腎室護理師更換套組，回輸壓恢復正常。',
-        finalSequence:[
-          { type:'button', which:'stop' },
-          { type:'confirm', label:'嚴重凝血不回血，處理透析導管，等待洗腎室護理師更換套組' }
-        ] },
-      { id:'lumen', cue:'用 20mL 空針反抽 Double Lumen 及生理食鹽水沖水皆不順暢。',
-        correct:'lumen', resolveText:'確診 Double Lumen 不順暢，按【停止】，評估管路阻塞無法回血，處理透析導管，等待醫師更換 Double Lumen 導管，回輸壓恢復正常。',
-        finalSequence:[
-          { type:'button', which:'stop' },
-          { type:'confirm', label:'評估管路阻塞無法回血，處理透析導管，等待醫師更換 Double Lumen 導管' }
-        ] },
-      { id:'cough', cue:'協助抽痰時病人劇烈咳嗽後警報。',
-        correct:'cough', resolveText:'待病人平靜後，按【鬆開管路夾】評估壓力是否下降（面板回輸壓箭頭回復至灰色區間顯示已下降），確認下降後按【繼續】，回輸壓回到安全範圍。',
-        finalSequence:[ { type:'button', which:'release' }, { type:'button', which:'continue' } ] }
-    ],
-    actionOptions:[
-      { id:'kink', label:'檢查回輸端管路（藍）是否被夾住或拗折，並協助排除' },
-      { id:'clot', label:'若排氣室嚴重凝血已影響運作，請洗腎室護理師協助更換套組' },
-      { id:'lumen', label:'醫師評估需更換 Double Lumen 導管' },
-      { id:'cough', label:'待病人平靜後，確認回輸壓力是否下降（面板回輸壓箭頭回復至灰色區間顯示已下降）' },
-      { id:'wrong-input', label:'檢查輸入端（紅）管路是否阻塞' }
-    ]
-  },
-
-  'filter-clot': {
-    title:'警告：過濾器已凝血', tag:'Filter Clotted ｜已核對機台實拍畫面',
-    date:'04/December/17', time:'15:10',
-    instructions:{
-      selfclear:'過濾器內有血液凝塊形成。請按 [停止] 並更換套組。', pre:null,
-      actions:[],
-      otherCauses:'血流途徑內有被夾住的管路；置換液、PBP 或病人脫水速率過高；注射器未正確安裝；注射器幫浦故障。',
-      help:null
-    },
-    gauges:[
-      { name:'輸入', value:-104, min:-250, max:300,
-        bands:[{end:-180,color:'red'},{end:-140,color:'yellow'},{end:100,color:'green'},{end:180,color:'yellow'},{end:300,color:'red'}] },
-      { name:'過濾器', value:433, min:10, max:450,
-        bands:[{end:250,color:'red'},{end:440,color:'green'},{end:450,color:'red'}] },
-      { name:'廢液', value:-70, min:-500, max:500,
-        bands:[{end:500,color:'green'}] },
-      { name:'回輸', value:122, min:10, max:450,
-        bands:[{end:100,color:'red'},{end:200,color:'green'},{end:350,color:'yellow'},{end:450,color:'red'}] }
-    ],
-    metrics:{ drop:308, tmp:316 },
-    hasRelease:false,
-    fixGauge:{ index:1, value:200 },
-    steps:['mute','diagnose','resume'],
-    causes:[
-      { id:'severe-clot', cue:'巡視管路時發現過濾器與排氣室出現暗紅色凝血塊，TMP 持續上升，確認已凝血且管路已有血塊阻塞。',
-        correct:'severe-clot', resolveText:'血塊已阻塞、無法安全回血，不執行回血動作，按【停止】，處理透析導管並聯絡洗腎室護理師更換套組，TMP 恢復正常。',
-        finalSequence:[
-          { type:'button', which:'stop' },
-          { type:'confirm', label:'處理透析導管並聯絡洗腎室護理師更換套組' }
-        ] }
-    ],
-    actionOptions:[
-      { id:'severe-clot', label:'血塊已阻塞、無法安全回血，不執行回血動作，準備更換套組' },
-      { id:'wrong-force-return', label:'套組已明顯凝血阻塞，執行回血', penalty:-3 }
-    ]
-  },
-
-  'bag-empty': {
-    title:'注意: 液袋已空', tag:'Bag Empty ｜已核對機台實拍畫面', severity:'notice', audioTrack:'notice',
-    date:'04/December/17', time:'16:50',
-    instructions:{
-      selfclear:null, pre:'如要更換置換液袋，請執行下列步驟。',
-      actions:[
-        '打開磅秤，夾住液袋和管路，再取下液袋。',
-        '將新液袋連接到管路，鬆開液袋和管路，然後關上磅秤。',
-        '準備就緒後，請按 [繼續]。'
-      ],
-      otherCauses:'液袋另有支撐力。',
-      help:null
-    },
-    rightPanelType:'octagon',
-    hasRelease:false,
-    steps:['mute','diagnose','resume'],
-    causes:[
-      { id:'purple', color:'#a31f6b', shape:'octagon', cue:'',
-        correct:'purple', resolveText:'打開紫色磅秤，關閉液袋管夾、取下空液袋，接上新液袋後鬆開管夾並關閉磅秤，按【繼續】，警示解除。' },
-      { id:'white', color:'#ffffff', shape:'triangle', cue:'',
-        correct:'white', resolveText:'打開白色磅秤，關閉液袋管夾、取下空液袋，接上新液袋後鬆開管夾並關閉磅秤，按【繼續】，警示解除。' },
-      { id:'green', color:'#4f7942', shape:'square', cue:'',
-        correct:'green', resolveText:'打開綠色磅秤，關閉液袋管夾、取下空液袋，接上新液袋後鬆開管夾並關閉磅秤，按【繼續】，警示解除。' }
-    ],
-    actionOptions:[
-      { id:'purple', label:'打開紫色磅秤，依步驟更換置換液袋' },
-      { id:'white', label:'打開白色磅秤，依步驟更換置換液袋' },
-      { id:'green', label:'打開綠色磅秤，依步驟更換置換液袋' }
-    ]
-  },
-
-  'flow-problem': {
-    title:'注意: 流動上的問題', tag:'Flow Problem ｜已核對機台實拍畫面', severity:'notice', audioTrack:'notice',
-    date:'10/August/17', time:'22:31',
-    rightPanelType:'octagon', badgeColor:'#c2287a',
-    instructions:{
-      selfclear:'並未按照預估的流速注射置換溶液。', pre:null,
-      actionsHeading:'檢查並確認以下事項:',
-      actions:[
-        '易碎栓已完全弄斷（如適用的話）。',
-        '管路夾已開；管路沒有拗折。',
-        '液體袋並未晃動亦未另有支撐力。',
-        '必要管路均已連結，並無滲漏。液袋接頭已拴緊。'
-      ],
-      note:'解決狀況後再按 [繼續]。',
-      otherCauses:'磅秤故障；非閉塞式幫浦。（請參閱操作手冊的「疑難排解」）。',
-      help:null
-    },
-    hasRelease:false,
-    fixGauge:null,
-    steps:['mute','diagnose','resume'],
-    causes:[
-      { id:'after-bag-change', color:'#a31f6b', shape:'octagon', cue:'更換完液袋後隨即發出警告。',
-        correct:'after-bag-change', resolveText:'檢查紫色磅秤：檢視更換液袋後管夾已正確開啟、管路無拗折、液袋接頭已正確旋緊無歪斜，再按【繼續】，警示解除。' },
-      { id:'turning', color:'#ffffff', shape:'triangle', cue:'協助病人翻身後隨即發出警告，管路因翻身晃動影響液體袋。',
-        correct:'turning', resolveText:'檢查白色磅秤，管路因翻身晃動影響液體袋，盡快完成翻身，結束後按【繼續】，警示解除。' },
-      { id:'drain', color:'#f2c744', shape:'circle', cue:'引流完廢液後隨即發出警告。',
-        correct:'drain', resolveText:'檢查黃色磅秤：檢視廢液袋管路管夾是否正確開啟，再按【繼續】，警示解除。' },
-      { id:'moving', color:'#4f7942', shape:'square', cue:'協助病人翻身時挪動 CRRT 機器隨即發出警告，加溫管線及液體袋有晃動情形。',
-        correct:'moving', resolveText:'檢查綠色磅秤，液袋是否有晃動情形，並於挪動機器前先按【更換液袋】按鈕，挪動後確實固定加溫管線避免懸吊於液袋上，再按【繼續】，警示解除。' }
-    ],
-    actionOptions:[
-      { id:'after-bag-change', label:'檢查紫色磅秤：管夾是否正確開啟、管路無拗折、液袋接頭已正確旋緊' },
-      { id:'turning', label:'檢查白色磅秤：盡快完成翻身' },
-      { id:'drain', label:'檢查黃色磅秤：廢液袋管路管夾是否正確開啟' },
-      { id:'moving', label:'檢查綠色磅秤：液袋是否有晃動情形，並於挪動機器前先按【更換液袋】按鈕，挪動後確實固定加溫管線避免懸吊於液袋上' }
-    ]
-  },
-
-  'blood-leak': {
-    title:'警告: 偵測到血液滲漏', tag:'Blood Leak Detected ｜已核對機台實拍畫面',
-    date:'04/December/17', time:'16:11',
-    rightPanelType:'none', resumeLabel:'忽略',
-    instructions:{
-      selfclear:null, pre:null,
-      actionsHeading:'動作:',
-      actions:[
-        '檢查廢液袋是否變色。相關指示請參閱 [幫助]。',
-        '按 [忽略]。請密切監控。會忽略警報達 2 分鐘。',
-        '如果警報仍未清除，請按 [停止] 並更換套組。'
-      ],
-      note:null,
-      warningNote:'如果重新調整了血液滲漏偵測器中的廢液管路，請在警報清除後按 [系統工具] 畫面中的 [正常化 BLD] 並按照指示進行。',
-      otherCauses:null,
-      help:'請參閱 [幫助]，了解更多疑難排解及其他可能原因。'
-    },
-    hasRelease:false,
-    steps:['mute','diagnose'],
-    causes:[
-      { id:'leak', cue:'檢查廢液管路（黃色）呈鮮紅色。',
-        correct:'leak', resolveText:'確認過濾器半透膜破裂造成血液滲漏，按【停止】，將 Double Lumen 封管並聯絡洗腎室護理師更換套組。',
-        finalSequence:[
-          { type:'button', which:'stop' },
-          { type:'confirm', label:'過濾器半透膜破裂，將 Double Lumen 封管並聯絡洗腎室護理師更換套組' }
-        ] },
-      { id:'rhabdo', cue:'檢查廢液管路（黃色）呈茶色，病人有橫紋肌溶解症病史。',
-        correct:'rhabdo', resolveText:'評估屬橫紋肌溶解症之正常茶色廢液表現，按【忽略】，繼續治療並密切監控。' },
-      { id:'lamp', cue:'檢查廢液管路（黃色）呈清澈，病人有使用烤燈，機器面對窗戶。',
-        correct:'lamp', resolveText:'評估烤燈位置或拉上窗簾，避免光線直接照射到機器偵測器後，按【忽略】，繼續治療。' }
-    ],
-    actionOptions:[
-      { id:'leak', label:'評估為過濾器半透膜破裂，造成血液滲漏' },
-      { id:'rhabdo', label:'評估屬橫紋肌溶解症之正常茶色廢液表現' },
-      { id:'lamp', label:'評估烤燈照射或窗戶陽光干擾偵測器，需調整烤燈位置或拉上窗簾' }
-    ]
-  }
-};
-
-const scenarios = [
-  { id:'access-low', unlocked:true },
-  { id:'return-high', unlocked:true },
-  { id:'bag-empty', unlocked:true },
-  { id:'flow-problem', unlocked:true },
-  { id:'filter-clot', unlocked:true },
-  { id:'blood-leak', unlocked:true }
-];
+/* 警報情境資料：改由 alarm-config.js 提供全域 alarmDefs / scenarios，此處不再重複定義 */
 
 const grid = document.getElementById('scenarioGrid');
 scenarios.forEach((s, i) => {
@@ -812,11 +564,12 @@ let seqIndex = 0;
 const BTN_PENALTY = { stop:-3, continue:-2, ignore:-2, release:-2, flow:-2 };
 const BTN_LABEL = { stop:'停止', continue:'繼續', ignore:'忽略', release:'鬆開管路夾', flow:'流速設定' };
 
-/* ---- 正式挑戰（限時排行賽）狀態 ---- */
+/* ---- 正式挑戰（班級場次）狀態 ---- */
 let sessionMode = false, sessionQueue = [], sessionIndex = 0, sessionTotal = 0, sessionResults = [];
 let roundWrongChoices = [];
 let timerInterval = null, timeLeft = 60;
 let roundFinished = false; // guards against a late correct-answer callback firing after the round already ended (timeout race)
+let currentSession = null; // 目前生效的 classSessions 場次（{id, activatedConfig, ...}），由 SessionStore 取得
 
 const mBanner = document.getElementById('mBanner');
 const btnMute = document.getElementById('btnMute');
@@ -852,7 +605,7 @@ function updateScoreDisplay(delta){
   if(delta < 0) el.classList.add('down');
 }
 
-function startScenario(id){
+function startScenario(id, forcedCauseId){
   document.getElementById('selectScreen').style.display = 'none';
   document.getElementById('playScreen').style.display = 'block';
   headerTitle.textContent = '遊戲情境演練';
@@ -860,7 +613,9 @@ function startScenario(id){
 
   currentAlarmId = id;
   currentDef = alarmDefs[id];
-  currentCause = currentDef.causes[Math.floor(Math.random() * currentDef.causes.length)];
+  currentCause = forcedCauseId
+    ? currentDef.causes.find(c => c.id === forcedCauseId)
+    : currentDef.causes[Math.floor(Math.random() * currentDef.causes.length)];
   mistakes = 0; score = 0; updateScoreDisplay(0);
   phase = 'mute';
   currentSequence = [];
@@ -906,7 +661,8 @@ function startScenario(id){
 
 function startTimer(){
   clearInterval(timerInterval);
-  timeLeft = 60;
+  const limit = (currentSession && currentSession.activatedConfig && currentSession.activatedConfig.questionTimeLimit) || 60;
+  timeLeft = limit;
   updateTimerDisplay();
   timerInterval = setInterval(() => {
     timeLeft--;
@@ -928,30 +684,60 @@ function roundTimeout(){
   finishRound(false);
 }
 
-function startChallenge(){
-  sessionMode = true;
-  sessionQueue = shuffle(Object.keys(alarmDefs)).slice(0, 3);
-  sessionIndex = 0; sessionTotal = 0; sessionResults = [];
-  startScenario(sessionQueue[0]);
+async function startChallenge(){
+  const startBtn = document.getElementById('startChallengeBtn');
+  startBtn.disabled = true;
+  const originalLabel = startBtn.textContent;
+  startBtn.textContent = '載入場次中…';
+  try {
+    const session = await SessionStore.getActiveSession();
+    if(!session){
+      showToast('目前尚未開放正式挑戰，請等待講師啟用本梯次。', 'bad');
+      startBtn.disabled = false; startBtn.textContent = originalLabel;
+      return;
+    }
+    const plan = await SessionStore.buildChallengeQuestionPlan(session);
+    if(!plan.length){
+      showToast('目前題池設定不足，請聯絡講師確認場次設定。', 'bad');
+      startBtn.disabled = false; startBtn.textContent = originalLabel;
+      return;
+    }
+    currentSession = session;
+    sessionMode = true;
+    sessionQueue = plan; // [{alarmId, causeId}, ...]
+    sessionIndex = 0; sessionTotal = 0; sessionResults = [];
+    startBtn.disabled = false; startBtn.textContent = originalLabel;
+    startScenario(sessionQueue[0].alarmId, sessionQueue[0].causeId);
+  } catch(e){
+    showToast('讀取場次資料失敗，請檢查網路後再試一次。', 'bad');
+    startBtn.disabled = false; startBtn.textContent = originalLabel;
+  }
 }
 
 function finishRound(completed){
   if(roundFinished) return;
   roundFinished = true;
   clearInterval(timerInterval);
+  const correctOpt = currentDef.actionOptions.find(o => o.id === currentCause.correct);
   sessionResults.push({
-    title: currentDef.title,
-    cue: currentCause.cue,
-    resolveText: currentCause.resolveText,
-    roundScore: score,
+    questionNumber: sessionIndex + 1,
+    alarmId: currentAlarmId,
+    alarmName: currentDef.title,
+    scenarioId: currentCause.scenarioId,
+    scenarioText: currentCause.cue,
+    correctAnswer: correctOpt ? correctOpt.label : '',
+    teachingPoint: currentCause.resolveText,
+    applicableErrorConcepts: currentCause.applicableErrorConcepts || [],
     completed: completed,
-    mistakes: roundWrongChoices.slice()
+    timeout: !completed,
+    roundScore: score,
+    errorEvents: roundWrongChoices.slice()
   });
   sessionTotal += score;
   sessionIndex++;
   if(sessionIndex < sessionQueue.length){
     showToast(completed ? `第 ${sessionIndex} 關完成！準備下一關…` : '準備下一關…', completed ? 'good' : 'bad');
-    setTimeout(() => startScenario(sessionQueue[sessionIndex]), 1400);
+    setTimeout(() => startScenario(sessionQueue[sessionIndex].alarmId, sessionQueue[sessionIndex].causeId), 1400);
   } else {
     setTimeout(() => showSessionResults(), 1000);
   }
@@ -976,14 +762,14 @@ function showSessionResults(){
     const div = document.createElement('div');
     div.className = 'round-item';
     let mistakesHtml = '';
-    if(r.mistakes.length){
-      mistakesHtml = `<div class="r-mistakes-h">⚠ 誤選紀錄（共 ${r.mistakes.length} 次）</div>` +
-        r.mistakes.map(m => `<div class="r-mistake">${m.label}（${m.penalty}分）</div>`).join('');
+    if(r.errorEvents.length){
+      mistakesHtml = `<div class="r-mistakes-h">⚠ 誤選紀錄（共 ${r.errorEvents.length} 次）</div>` +
+        r.errorEvents.map(m => `<div class="r-mistake">${m.selectedAction}（${m.penalty}分）</div>`).join('');
     }
     div.innerHTML = `
-      <div class="rh"><span class="rt">第 ${i+1} 關．${r.title}</span><span class="rs">${r.roundScore} 分</span></div>
+      <div class="rh"><span class="rt">第 ${i+1} 關．${r.alarmName}</span><span class="rs">${r.roundScore} 分</span></div>
       <div class="r-status ${r.completed ? '' : 'timeout'}">${r.completed ? '✅ 已完成' : '⏱ 時間到，未完成'}</div>
-      <div class="r-answer"><b>情境：</b>${r.cue}<br><b>正確處置：</b>${r.resolveText}</div>
+      <div class="r-answer"><b>情境：</b>${r.scenarioText}<br><b>正確處置：</b>${r.teachingPoint}</div>
       ${mistakesHtml}`;
     wrap.appendChild(div);
   });
@@ -1001,12 +787,9 @@ async function submitScore(){
   submitBtn.textContent = '提交中…';
   const params = new URLSearchParams(location.search);
   const name = params.get('name') || '未具名學員';
-  const entry = {
-    name, totalScore: sessionTotal, timestamp: Date.now(),
-    rounds: sessionResults.map(r => ({ title:r.title, roundScore:r.roundScore, completed:r.completed, mistakes:r.mistakes }))
-  };
   try {
-    await db.collection('leaderboard').add(entry);
+    if(!currentSession) throw new Error('場次已結束或不存在，請重新整理頁面');
+    await SessionStore.submitChallenge(currentSession, name, sessionTotal, sessionQueue.length, sessionResults);
     submitBtn.textContent = '✅ 已提交成績';
     statusEl.textContent = '成績已送出，可至排行榜查看';
   } catch(e){
@@ -1083,8 +866,18 @@ function applyButtonPenalty(which){
   const p = BTN_PENALTY[which];
   score += p; updateScoreDisplay(p);
   mistakes++;
-  if(sessionMode) roundWrongChoices.push({ label: `未依序按下【${BTN_LABEL[which]}】`, penalty: p });
-  if(p <= -3){
+  const def = BUTTON_ERROR_DEFS[which] || {};
+  const highRisk = def.highRisk === true;
+  if(sessionMode){
+    roundWrongChoices.push({
+      errorType: 'button', selectedAction: `未依序按下【${BTN_LABEL[which]}】`, penalty: p,
+      errorConcept: def.errorConcept, highRisk,
+      correctAction: '', teachingPoint: def.teachingPoint || '', timestamp: Date.now()
+    });
+  }
+  if(highRisk){
+    showToast(`🚫 危險操作 (${p}分)`, 'bad');
+  } else if(p <= -3){
     showToast(`🚫 嚴禁按下【${BTN_LABEL[which]}】排除警報 (${p}分)`, 'bad');
   } else {
     showToast(`⚠ 尚未完成正確流程就按下【${BTN_LABEL[which]}】 (${p}分)`, 'bad');
@@ -1134,8 +927,19 @@ function handleAction(option, btnEl){
     btnEl.disabled = true;
     const penalty = option.penalty !== undefined ? option.penalty : -1;
     score += penalty; updateScoreDisplay(penalty);
-    if(sessionMode) roundWrongChoices.push({ label: option.label, penalty });
-    if(penalty <= -3){
+    // errorConcept／highRisk：純干擾選項用自己定義的值；跨情境誤選（選到本警報其他情境的正解）
+    // 用該警報的 defaultWrongErrorConcept，一律視為非高風險。
+    const errorConcept = option.errorConcept || currentDef.defaultWrongErrorConcept || 'scenario-mismatch';
+    const highRisk = option.highRisk === true;
+    if(sessionMode){
+      const correctOpt = currentDef.actionOptions.find(o => o.id === currentCause.correct);
+      roundWrongChoices.push({
+        errorType: 'option', selectedAction: option.label, penalty, errorConcept, highRisk,
+        correctAction: correctOpt ? correctOpt.label : '', teachingPoint: currentCause.resolveText,
+        timestamp: Date.now()
+      });
+    }
+    if(highRisk){
       showToast(`🚫 危險操作，可能造成栓塞或治療併發症 (${penalty}分)`, 'bad');
     } else {
       showToast(`此措施未改善狀況，請重新評估其他可能原因 (${penalty}分)`, 'bad');
@@ -1229,6 +1033,34 @@ document.getElementById('backBtn').addEventListener('click', () => {
   const name = params.get('name');
   if(name){
     headerSub.textContent = `歡迎，${name}！選擇警報情境開始演練`;
+  }
+})();
+
+/* 頁面載入時檢查目前是否有講師啟用中的班級場次，決定「正式挑戰」按鈕是否可點擊 */
+(async function checkActiveSessionOnLoad(){
+  const btn = document.getElementById('startChallengeBtn');
+  const statusEl = document.getElementById('challengeStatus');
+  if(!btn) return;
+  try {
+    const session = await SessionStore.getActiveSession();
+    if(session){
+      currentSession = session;
+      btn.disabled = false;
+      const cfg = session.activatedConfig || {};
+      statusEl.style.display = 'block';
+      statusEl.className = 'challenge-status ready';
+      statusEl.textContent = `本次正式挑戰：${cfg.totalQuestions || '?'} 題，每題限時 ${cfg.questionTimeLimit || 60} 秒`;
+    } else {
+      btn.disabled = true;
+      statusEl.style.display = 'block';
+      statusEl.className = 'challenge-status blocked';
+      statusEl.textContent = '目前尚未開放正式挑戰，請等待講師啟用本梯次。';
+    }
+  } catch(e){
+    btn.disabled = true;
+    statusEl.style.display = 'block';
+    statusEl.className = 'challenge-status blocked';
+    statusEl.textContent = '目前無法確認場次狀態，請檢查網路後重新整理頁面。';
   }
 })();
 </script>

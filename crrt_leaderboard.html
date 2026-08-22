@@ -20,6 +20,8 @@
   const db = firebase.firestore();
   const auth = firebase.auth();
 </script>
+<script src="alarm-config.js"></script>
+<script src="session-store.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>排行榜｜CRRT 模擬訓練系統</title>
@@ -41,7 +43,7 @@
   }
   header{
     position:sticky; top:0; z-index:20; background:rgba(7,27,52,0.92); backdrop-filter:blur(6px);
-    border-bottom:1px solid rgba(143,230,236,0.15); padding:14px 18px; display:flex; align-items:center; gap:14px;
+    border-bottom:1px solid rgba(143,230,236,0.15); padding:14px 18px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
   }
   .back-btn{
     width:36px; height:36px; border-radius:10px; border:1px solid rgba(143,230,236,0.3);
@@ -50,23 +52,35 @@
   }
   .header-text .title{ font-family:'Rajdhani', sans-serif; font-weight:700; font-size:19px; letter-spacing:1px; }
   .header-text .sub{ font-size:11.5px; color:var(--cyan-soft); letter-spacing:1px; margin-top:2px;}
-  .refresh-btn{
-    margin-left:auto; font-family:inherit; font-size:12px; font-weight:700; color:var(--cyan-soft);
+  .header-btns{ margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+  .pill-btn{
+    font-family:inherit; font-size:11.5px; font-weight:700; color:var(--cyan-soft);
     background:rgba(255,255,255,0.06); border:1px solid rgba(143,230,236,0.25); border-radius:20px;
-    padding:8px 14px; cursor:pointer; flex-shrink:0;
+    padding:8px 12px; cursor:pointer; flex-shrink:0; white-space:nowrap;
   }
-  main{ max-width:680px; margin:0 auto; padding:20px 16px 0; }
+  .pill-btn.logged-in{ color:var(--ok); border-color:rgba(57,201,143,0.4); background:rgba(57,201,143,0.1); }
+  main{ max-width:760px; margin:0 auto; padding:20px 16px 0; }
 
-  .loading{ text-align:center; padding:60px 20px; color:var(--muted); font-size:13px; }
+  .section-title{ font-size:15px; font-weight:900; margin:26px 0 12px; display:flex; align-items:center; gap:8px; }
+  .section-title:first-child{ margin-top:0; }
+  .section-sub{ font-size:11.5px; color:var(--muted); margin:-8px 0 12px; line-height:1.6; }
+
+  .active-session-bar{
+    background:rgba(57,201,143,0.08); border:1px solid rgba(57,201,143,0.3); border-radius:12px;
+    padding:12px 16px; font-size:12.5px; margin-bottom:18px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  }
+  .active-session-bar.none{ background:rgba(232,178,61,0.08); border-color:rgba(232,178,61,0.3); color:#f2d99a; }
+  .active-session-bar b{ color:var(--ok); }
+  .active-session-bar.none b{ color:var(--warn); }
+
+  .loading{ text-align:center; padding:50px 20px; color:var(--muted); font-size:13px; }
   .loading .spin{ font-size:28px; margin-bottom:10px; animation:spin 1.2s linear infinite; display:inline-block; }
   @keyframes spin{ to{ transform:rotate(360deg); } }
-
-  .empty-state{ text-align:center; padding:50px 20px; color:var(--muted); font-size:13px; line-height:1.8; }
-  .empty-state .big{ font-size:34px; margin-bottom:10px; }
-
+  .empty-state{ text-align:center; padding:40px 20px; color:var(--muted); font-size:13px; line-height:1.8; }
+  .empty-state .big{ font-size:30px; margin-bottom:10px; }
   .error-state{
     background:rgba(229,72,77,0.1); border:1px solid rgba(229,72,77,0.35); border-radius:12px;
-    padding:14px; font-size:12.5px; color:#f5b9bc; text-align:center; margin-top:20px;
+    padding:14px; font-size:12.5px; color:#f5b9bc; text-align:center; margin-top:12px;
   }
 
   .rank-row{
@@ -77,7 +91,6 @@
   .rank-row.top1{ border-color:rgba(240,196,25,0.5); background:linear-gradient(90deg, rgba(240,196,25,0.1), rgba(255,255,255,0.045)); }
   .rank-row.top2{ border-color:rgba(199,208,216,0.4); }
   .rank-row.top3{ border-color:rgba(205,127,50,0.4); }
-
   .rank-num{
     width:34px; height:34px; border-radius:50%; background:var(--navy-panel); color:var(--cyan-soft);
     display:flex; align-items:center; justify-content:center; font-weight:900; font-size:14px; flex-shrink:0;
@@ -86,26 +99,10 @@
   .rank-row.top1 .rank-num{ background:var(--gold); color:#3a2c00; }
   .rank-row.top2 .rank-num{ background:var(--silver); color:#1c2733; }
   .rank-row.top3 .rank-num{ background:var(--bronze); color:#2e1a05; }
-
   .rank-info{ flex:1; min-width:0; }
   .rank-info .rn-name{ font-size:14.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .rank-info .rn-meta{ font-size:10.5px; color:var(--muted); margin-top:2px; }
   .rank-score{ font-size:19px; font-weight:900; color:var(--cyan-accent); font-family:'Share Tech Mono',monospace; flex-shrink:0; }
-  .rank-chevron{ color:var(--muted); font-size:14px; flex-shrink:0; transition:transform .2s; }
-  .rank-row.expanded .rank-chevron{ transform:rotate(90deg); }
-  .delete-btn{
-    flex-shrink:0; width:30px; height:30px; border-radius:8px; border:1px solid rgba(229,72,77,0.3);
-    background:rgba(229,72,77,0.08); color:var(--alarm); font-size:14px; cursor:pointer;
-    display:flex; align-items:center; justify-content:center;
-  }
-  .delete-btn:hover{ background:rgba(229,72,77,0.2); }
-
-  .auth-btn{
-    margin-left:auto; font-family:inherit; font-size:11.5px; font-weight:700; color:var(--cyan-soft);
-    background:rgba(255,255,255,0.06); border:1px solid rgba(143,230,236,0.25); border-radius:20px;
-    padding:8px 12px; cursor:pointer; flex-shrink:0; white-space:nowrap;
-  }
-  .auth-btn.logged-in{ color:var(--ok); border-color:rgba(57,201,143,0.4); background:rgba(57,201,143,0.1); }
 
   .login-panel{
     position:fixed; inset:0; z-index:50; background:rgba(4,12,24,0.75);
@@ -128,8 +125,31 @@
   #loginSubmitBtn{ background:var(--cyan-accent); color:var(--navy-deep); }
   #loginCancelBtn{ background:rgba(255,255,255,0.08); color:#fff; border:1px solid rgba(143,230,236,0.25); }
 
+  .card{
+    background:rgba(255,255,255,0.045); border:1px solid rgba(143,230,236,0.15); border-radius:14px;
+    padding:16px; margin-bottom:12px;
+  }
+  .card.highrisk{ border-color:rgba(229,72,77,0.35); background:rgba(229,72,77,0.06); }
+  .card-h{ font-size:13.5px; font-weight:700; margin-bottom:6px; }
+  .card-meta{ font-size:11px; color:var(--muted); margin-bottom:8px; }
+  .card-rate{ font-size:22px; font-weight:900; color:var(--alarm); font-family:'Share Tech Mono',monospace; }
+  .card.highrisk .card-rate{ color:var(--warn); }
+  .card-desc{ font-size:11.5px; color:var(--cyan-soft); line-height:1.6; margin-top:6px; }
+
+  .scenario-row{
+    background:rgba(255,255,255,0.04); border:1px solid rgba(143,230,236,0.12); border-radius:10px;
+    padding:12px 14px; margin-bottom:8px; font-size:12px;
+  }
+  .scenario-row .sr-h{ display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; font-weight:700; }
+  .scenario-row .sr-text{ color:var(--cyan-soft); margin-bottom:6px; line-height:1.5; }
+  .scenario-row .sr-stats{ display:flex; gap:14px; flex-wrap:wrap; font-size:11px; color:var(--muted); }
+  .scenario-row .sr-stats b{ color:#fff; }
+  .scenario-row .sr-wrong{ margin-top:6px; font-size:11px; color:var(--muted); }
+
   .rank-detail{ display:none; padding:0 16px 14px 62px; margin-top:-10px; }
   .rank-detail.show{ display:block; }
+  .rank-chevron{ color:var(--muted); font-size:14px; flex-shrink:0; transition:transform .2s; }
+  .rank-row.expanded .rank-chevron{ transform:rotate(90deg); }
   .round-item{
     background:rgba(255,255,255,0.04); border:1px solid rgba(143,230,236,0.12); border-radius:10px;
     padding:11px 13px; margin-bottom:8px; font-size:12px;
@@ -139,8 +159,13 @@
   .round-item .rs{ font-weight:900; color:var(--cyan-soft); font-family:'Share Tech Mono',monospace; }
   .round-item .r-status{ font-size:10px; color:var(--muted); margin-bottom:6px; }
   .round-item .r-status.timeout{ color:var(--alarm); }
+  .round-item .r-answer{
+    font-size:11px; color:#dbeaf4; line-height:1.6; background:rgba(57,201,143,0.08);
+    border-left:3px solid var(--ok); padding:7px 9px; border-radius:6px; margin-bottom:7px;
+  }
   .round-item .r-mistakes-h{ font-size:10px; color:var(--alarm); font-weight:700; margin-bottom:3px; }
   .round-item .r-mistake{ font-size:10.5px; color:var(--muted); line-height:1.6; padding-left:8px; border-left:2px solid rgba(229,72,77,0.35); margin-bottom:3px; }
+  .round-item .r-mistake.highrisk{ color:#f5b9bc; border-left-color:var(--alarm); font-weight:700; }
   .round-item .no-mistakes{ font-size:10.5px; color:var(--ok); }
 
   .filter-bar{ display:flex; gap:8px; margin-bottom:16px; }
@@ -150,7 +175,78 @@
   }
   .filter-bar input::placeholder{ color:var(--muted); }
 
-  .count-note{ font-size:11px; color:var(--muted); text-align:center; margin:16px 0 4px; }
+  details.legacy{ margin-top:34px; }
+  details.legacy summary{
+    cursor:pointer; font-size:12.5px; color:var(--muted); padding:10px 0; list-style:none;
+  }
+  details.legacy summary::-webkit-details-marker{ display:none; }
+  details.legacy summary::before{ content:'▸ '; }
+  details.legacy[open] summary::before{ content:'▾ '; }
+
+  /* ---- 老師：場次管理 ---- */
+  .session-panel{
+    position:fixed; inset:0; z-index:60; background:rgba(4,12,24,0.85);
+    display:flex; align-items:flex-start; justify-content:center; padding:20px; overflow-y:auto;
+  }
+  .session-box{
+    background:var(--navy-mid); border:1px solid rgba(143,230,236,0.25); border-radius:16px;
+    padding:22px; width:100%; max-width:560px; margin:20px 0;
+  }
+  .session-box h3{ font-size:16px; margin-bottom:16px; }
+  .session-list-item{
+    background:rgba(255,255,255,0.04); border:1px solid rgba(143,230,236,0.15); border-radius:10px;
+    padding:12px 14px; margin-bottom:8px; display:flex; align-items:center; gap:10px; font-size:12.5px;
+  }
+  .status-badge{ font-size:10px; font-weight:700; padding:3px 8px; border-radius:10px; flex-shrink:0; }
+  .status-badge.draft{ background:rgba(143,230,236,0.15); color:var(--cyan-soft); }
+  .status-badge.active{ background:rgba(57,201,143,0.2); color:var(--ok); }
+  .status-badge.closed{ background:rgba(255,255,255,0.08); color:var(--muted); }
+  .session-list-item .sname{ flex:1; font-weight:700; }
+  .session-list-item button{
+    font-family:inherit; font-size:11px; font-weight:700; padding:6px 10px; border-radius:8px; border:none; cursor:pointer;
+    background:rgba(255,255,255,0.08); color:#fff;
+  }
+  .session-list-item button.primary{ background:var(--cyan-accent); color:var(--navy-deep); }
+
+  .config-form label{ display:block; font-size:12px; font-weight:700; margin:14px 0 6px; color:var(--cyan-soft); }
+  .config-form input[type="text"], .config-form input[type="number"]{
+    width:100%; padding:10px 12px; border-radius:8px; border:1px solid rgba(143,230,236,0.2);
+    background:rgba(255,255,255,0.05); color:#fff; font-size:13px; font-family:inherit;
+  }
+  .config-form input[type="range"]{ width:100%; }
+  .range-value{ font-size:13px; font-weight:700; color:var(--cyan-accent); margin-top:4px; }
+  .alarm-check-list{ display:flex; flex-direction:column; gap:6px; }
+  .alarm-check-row{
+    display:flex; align-items:center; gap:8px; font-size:12px; padding:8px 10px;
+    background:rgba(255,255,255,0.03); border-radius:8px;
+  }
+  .config-summary{
+    font-size:12.5px; padding:10px 12px; border-radius:8px; margin:14px 0; line-height:1.6;
+  }
+  .config-summary.ok{ background:rgba(57,201,143,0.1); color:#9de8c8; border:1px solid rgba(57,201,143,0.3); }
+  .config-summary.error{ background:rgba(229,72,77,0.1); color:#f5b9bc; border:1px solid rgba(229,72,77,0.3); }
+  .form-actions{ display:flex; gap:8px; margin-top:16px; }
+  .form-actions button{
+    flex:1; font-family:inherit; font-weight:700; font-size:13px; padding:12px; border-radius:10px; border:none; cursor:pointer;
+  }
+  .form-actions .save-btn{ background:var(--cyan-accent); color:var(--navy-deep); }
+  .form-actions .save-btn:disabled{ opacity:0.4; cursor:not-allowed; }
+  .form-actions .cancel-btn{ background:rgba(255,255,255,0.08); color:#fff; border:1px solid rgba(143,230,236,0.25); }
+  .close-panel-btn{
+    width:32px; height:32px; border-radius:8px; border:1px solid rgba(143,230,236,0.25); background:rgba(255,255,255,0.05);
+    color:var(--cyan-soft); float:right; cursor:pointer; font-size:16px;
+  }
+
+  .confirm-overlay{
+    position:fixed; inset:0; z-index:70; background:rgba(4,12,24,0.85);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .confirm-box{
+    background:var(--navy-mid); border:1px solid rgba(232,178,61,0.4); border-radius:16px;
+    padding:22px; width:100%; max-width:380px; text-align:center;
+  }
+  .confirm-box p{ font-size:13px; line-height:1.7; margin-bottom:18px; }
+  .confirm-box .form-actions button:first-child{ background:var(--warn); color:#2a1c00; }
 </style>
 </head>
 <body>
@@ -159,10 +255,13 @@
   <button class="back-btn" id="backBtn">←</button>
   <div class="header-text">
     <div class="title">排行榜</div>
-    <div class="sub">正式挑戰成績・依總分排序</div>
+    <div class="sub" id="headerSub">目前場次成績・依總分排序</div>
   </div>
-  <button class="auth-btn" id="authBtn">🔑 老師登入</button>
-  <button class="refresh-btn" id="refreshBtn">↻ 重新整理</button>
+  <div class="header-btns">
+    <button class="pill-btn" id="sessionManagerBtn" style="display:none;">🗂 場次管理</button>
+    <button class="pill-btn" id="authBtn">🔑 老師登入</button>
+    <button class="pill-btn" id="refreshBtn">↻ 重新整理</button>
+  </div>
 </header>
 
 <div class="login-panel" id="loginPanel" style="display:none;">
@@ -178,182 +277,665 @@
   </div>
 </div>
 
+<div class="session-panel" id="sessionPanel" style="display:none;"></div>
+<div class="confirm-overlay" id="confirmOverlay" style="display:none;"></div>
+
 <main>
+  <div id="sessionStatusBar"></div>
+
+  <div class="section-title">🏆 個人排行榜</div>
   <div class="filter-bar" id="filterBar" style="display:none;">
     <input type="text" id="filterInput" placeholder="搜尋學員姓名…">
   </div>
-
-  <div id="content">
-    <div class="loading"><div class="spin">⏳</div>讀取排行榜資料中…</div>
+  <div id="leaderboardContent">
+    <div class="loading"><div class="spin">⏳</div>讀取中…</div>
   </div>
+
+  <div id="teacherSections" style="display:none;">
+    <div class="section-title">⚠️ 高風險錯誤</div>
+    <div class="section-sub">只要發生一次即顯示，不受最低樣本數限制；每位學員每一情境最多計 1 次。</div>
+    <div id="highRiskContent"></div>
+
+    <div class="section-title">🧠 本班最常見錯誤觀念 TOP 3</div>
+    <div class="section-sub">依「錯誤率」排序（該概念有效作答中曾犯錯的比例），需至少 5 個有效樣本才會顯示。</div>
+    <div id="top3Content"></div>
+
+    <div class="section-title">📊 各情境答題分析</div>
+    <div class="section-sub">被分配人數／完成人數／正確人數／錯誤人數／逾時人數，錯誤率以完成人數為分母。</div>
+    <div id="scenarioAnalysisContent"></div>
+
+    <div class="section-title">👤 個別學員錯誤明細</div>
+    <div id="individualContent"></div>
+  </div>
+
+  <details class="legacy">
+    <summary>📁 歷史成績（舊版，不納入班級統計）</summary>
+    <div class="section-sub" style="margin-top:8px;">此區為改版前累積的舊資料，僅供查看，不參與 TOP3／高風險／情境分析等新版統計。</div>
+    <div class="filter-bar" id="legacyFilterBar" style="display:none; margin-top:10px;">
+      <input type="text" id="legacyFilterInput" placeholder="搜尋學員姓名…">
+    </div>
+    <div id="legacyContent">
+      <div class="loading"><div class="spin">⏳</div>讀取中…</div>
+    </div>
+  </details>
 </main>
 
 <script>
-  const backBtn = document.getElementById('backBtn');
-  const refreshBtn = document.getElementById('refreshBtn');
-  const content = document.getElementById('content');
-  const filterBar = document.getElementById('filterBar');
-  const filterInput = document.getElementById('filterInput');
+function escapeHtml(s){
+  const div = document.createElement('div');
+  div.textContent = s == null ? '' : s;
+  return div.innerHTML;
+}
+function fmtTime(ts){
+  try {
+    const d = (ts && ts.toDate) ? ts.toDate() : new Date(ts);
+    const pad = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch(e){ return ''; }
+}
+function fmtPct(x){ return (x*100).toFixed(0) + '%'; }
 
-  let allEntries = [];
-  let isTeacherLoggedIn = false;
+const backBtn = document.getElementById('backBtn');
+const refreshBtn = document.getElementById('refreshBtn');
+const authBtn = document.getElementById('authBtn');
+const sessionManagerBtn = document.getElementById('sessionManagerBtn');
+const loginPanel = document.getElementById('loginPanel');
+const loginEmail = document.getElementById('loginEmail');
+const loginPassword = document.getElementById('loginPassword');
+const loginError = document.getElementById('loginError');
+const sessionPanel = document.getElementById('sessionPanel');
+const confirmOverlay = document.getElementById('confirmOverlay');
 
-  const authBtn = document.getElementById('authBtn');
-  const loginPanel = document.getElementById('loginPanel');
-  const loginEmail = document.getElementById('loginEmail');
-  const loginPassword = document.getElementById('loginPassword');
-  const loginError = document.getElementById('loginError');
+let isTeacherLoggedIn = false;
+let activeSession = null;
+let viewingSummaries = [];
 
-  authBtn.addEventListener('click', () => {
-    if(isTeacherLoggedIn){
-      auth.signOut();
-    } else {
-      loginError.textContent = '';
-      loginEmail.value = '';
-      loginPassword.value = '';
-      loginPanel.style.display = 'flex';
-      loginEmail.focus();
-    }
-  });
-  document.getElementById('loginCancelBtn').addEventListener('click', () => {
-    loginPanel.style.display = 'none';
-  });
-  document.getElementById('loginSubmitBtn').addEventListener('click', doLogin);
-  loginPassword.addEventListener('keydown', (e) => { if(e.key === 'Enter') doLogin(); });
+backBtn.addEventListener('click', () => {
+  const params = new URLSearchParams(location.search);
+  const name = params.get('name');
+  location.href = 'index.html' + (name ? ('?name=' + encodeURIComponent(name)) : '');
+});
+refreshBtn.addEventListener('click', () => { loadEverything(); });
 
-  async function doLogin(){
+authBtn.addEventListener('click', () => {
+  if(isTeacherLoggedIn){
+    auth.signOut();
+  } else {
     loginError.textContent = '';
-    const email = loginEmail.value.trim();
-    const password = loginPassword.value;
-    if(!email || !password){
-      loginError.textContent = '請輸入 Email 與密碼。';
-      return;
-    }
-    try {
-      await auth.signInWithEmailAndPassword(email, password);
-      loginPanel.style.display = 'none';
-    } catch(e){
-      loginError.textContent = '登入失敗，請確認帳號密碼是否正確。';
-    }
+    loginEmail.value = '';
+    loginPassword.value = '';
+    loginPanel.style.display = 'flex';
+    loginEmail.focus();
   }
+});
+document.getElementById('loginCancelBtn').addEventListener('click', () => { loginPanel.style.display = 'none'; });
+document.getElementById('loginSubmitBtn').addEventListener('click', doLogin);
+loginPassword.addEventListener('keydown', (e) => { if(e.key === 'Enter') doLogin(); });
 
-  auth.onAuthStateChanged((user) => {
-    isTeacherLoggedIn = !!user;
-    authBtn.textContent = isTeacherLoggedIn ? `👤 ${user.email}（登出）` : '🔑 老師登入';
-    authBtn.classList.toggle('logged-in', isTeacherLoggedIn);
-    renderList(filterInput.value.trim());
-  });
-
-  backBtn.addEventListener('click', () => {
-    const params = new URLSearchParams(location.search);
-    const name = params.get('name');
-    location.href = 'index.html' + (name ? ('?name=' + encodeURIComponent(name)) : '');
-  });
-  refreshBtn.addEventListener('click', loadLeaderboard);
-  filterInput.addEventListener('input', () => renderList(filterInput.value.trim()));
-
-  function fmtTime(ts){
-    try {
-      const d = new Date(ts);
-      const pad = n => String(n).padStart(2,'0');
-      return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    } catch(e){ return ''; }
+async function doLogin(){
+  loginError.textContent = '';
+  const email = loginEmail.value.trim();
+  const password = loginPassword.value;
+  if(!email || !password){ loginError.textContent = '請輸入 Email 與密碼。'; return; }
+  try {
+    await auth.signInWithEmailAndPassword(email, password);
+    loginPanel.style.display = 'none';
+  } catch(e){
+    loginError.textContent = '登入失敗，請確認帳號密碼是否正確。';
   }
+}
 
-  async function loadLeaderboard(){
-    content.innerHTML = `<div class="loading"><div class="spin">⏳</div>讀取排行榜資料中…</div>`;
+auth.onAuthStateChanged((user) => {
+  isTeacherLoggedIn = !!user;
+  authBtn.textContent = isTeacherLoggedIn ? `👤 ${user.email}（登出）` : '🔑 老師登入';
+  authBtn.classList.toggle('logged-in', isTeacherLoggedIn);
+  sessionManagerBtn.style.display = isTeacherLoggedIn ? 'inline-block' : 'none';
+  document.getElementById('teacherSections').style.display = isTeacherLoggedIn ? 'block' : 'none';
+  loadEverything();
+});
+
+async function loadEverything(){
+  await refreshSessionStatusBar();
+  await loadLeaderboardSection();
+  if(isTeacherLoggedIn){
+    await loadTeacherAnalytics();
+  }
+  await loadLegacyLeaderboard();
+}
+
+async function refreshSessionStatusBar(){
+  const bar = document.getElementById('sessionStatusBar');
+  try {
+    activeSession = await SessionStore.getActiveSession();
+  } catch(e){
+    activeSession = null;
+  }
+  if(activeSession){
+    bar.innerHTML = `<div class="active-session-bar">🟢 目前進行中場次：<b>${escapeHtml(activeSession.sessionName)}</b>（${(activeSession.activatedConfig||{}).totalQuestions || '?'} 題／每題 ${(activeSession.activatedConfig||{}).questionTimeLimit || 60} 秒）</div>`;
+  } else {
+    bar.innerHTML = `<div class="active-session-bar none">🟡 目前沒有進行中的班級場次，學員端「正式挑戰」暫不可用。${isTeacherLoggedIn ? '請點右上角「🗂 場次管理」建立並啟用場次。' : '請等待講師啟用本梯次。'}</div>`;
+  }
+}
+
+async function loadLeaderboardSection(){
+  const content = document.getElementById('leaderboardContent');
+  const filterBar = document.getElementById('filterBar');
+  content.innerHTML = `<div class="loading"><div class="spin">⏳</div>讀取中…</div>`;
+  if(!activeSession){
     filterBar.style.display = 'none';
-    try {
-      const snapshot = await db.collection('leaderboard').orderBy('totalScore', 'desc').get();
-      const entries = [];
-      snapshot.forEach(doc => entries.push({ ...doc.data(), _id: doc.id }));
-      allEntries = entries;
-      filterBar.style.display = entries.length > 5 ? 'flex' : 'none';
-      renderList('');
-    } catch(e){
-      content.innerHTML = `<div class="error-state">⚠ 讀取排行榜失敗，請點右上角「重新整理」再試一次。（${e && e.message ? e.message : '未知錯誤'}）</div>`;
-    }
+    content.innerHTML = `<div class="empty-state"><div class="big">🟡</div>目前沒有進行中的場次，尚無排行榜資料。</div>`;
+    return;
   }
+  try {
+    viewingSummaries = await SessionStore.loadPublicSummaries(activeSession.id);
+    filterBar.style.display = viewingSummaries.length > 5 ? 'flex' : 'none';
+    renderLeaderboardList('');
+  } catch(e){
+    content.innerHTML = `<div class="error-state">⚠ 讀取排行榜失敗，請重新整理再試一次。（${e && e.message ? e.message : '未知錯誤'}）</div>`;
+  }
+}
+document.getElementById('filterInput').addEventListener('input', (e) => renderLeaderboardList(e.target.value.trim()));
 
-  function renderList(filterText){
-    const filtered = filterText
-      ? allEntries.filter(e => (e.name||'').toLowerCase().includes(filterText.toLowerCase()))
-      : allEntries;
+function renderLeaderboardList(filterText){
+  const content = document.getElementById('leaderboardContent');
+  const filtered = filterText
+    ? viewingSummaries.filter(e => (e.playerName||'').toLowerCase().includes(filterText.toLowerCase()))
+    : viewingSummaries;
+  if(viewingSummaries.length === 0){
+    content.innerHTML = `<div class="empty-state"><div class="big">🏁</div>目前還沒有人提交成績。<br>完成一次「正式挑戰」後即可上榜！</div>`;
+    return;
+  }
+  if(filtered.length === 0){
+    content.innerHTML = `<div class="empty-state"><div class="big">🔍</div>找不到符合的學員姓名。</div>`;
+    return;
+  }
+  content.innerHTML = '';
+  filtered.forEach((entry) => {
+    const rank = viewingSummaries.indexOf(entry) + 1;
+    const row = document.createElement('div');
+    row.className = 'rank-row' + (rank === 1 ? ' top1' : rank === 2 ? ' top2' : rank === 3 ? ' top3' : '');
+    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+    row.innerHTML = `
+      <div class="rank-num">${medal}</div>
+      <div class="rank-info">
+        <div class="rn-name">${escapeHtml(entry.playerName || '未具名學員')}</div>
+        <div class="rn-meta">${fmtTime(entry.createdAt)} ・ 共 ${entry.totalQuestions ?? '?'} 關</div>
+      </div>
+      <div class="rank-score">${entry.totalScore ?? 0}</div>`;
+    content.appendChild(row);
+  });
+}
 
-    if(allEntries.length === 0){
-      content.innerHTML = `<div class="empty-state"><div class="big">🏁</div>目前還沒有人提交成績。<br>完成一次「正式挑戰」後即可上榜！</div>`;
-      return;
-    }
-    if(filtered.length === 0){
-      content.innerHTML = `<div class="empty-state"><div class="big">🔍</div>找不到符合的學員姓名。</div>`;
-      return;
-    }
+let allChallenges = [];
 
-    content.innerHTML = '';
-    filtered.forEach((entry, idx) => {
-      const rank = allEntries.indexOf(entry) + 1;
-      const row = document.createElement('div');
-      row.className = 'rank-row' + (rank === 1 ? ' top1' : rank === 2 ? ' top2' : rank === 3 ? ' top3' : '');
-      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
-      row.innerHTML = `
-        <div class="rank-num">${medal}</div>
-        <div class="rank-info">
-          <div class="rn-name">${escapeHtml(entry.name || '未具名學員')}</div>
-          <div class="rn-meta">${fmtTime(entry.timestamp)} ・ 共 ${(entry.rounds||[]).length} 關</div>
+async function loadTeacherAnalytics(){
+  const scenarioEl = document.getElementById('scenarioAnalysisContent');
+  const top3El = document.getElementById('top3Content');
+  const hrEl = document.getElementById('highRiskContent');
+  const indivEl = document.getElementById('individualContent');
+  [scenarioEl, top3El, hrEl, indivEl].forEach(el => el.innerHTML = `<div class="loading"><div class="spin">⏳</div>讀取中…</div>`);
+  if(!activeSession){
+    [scenarioEl, top3El, hrEl, indivEl].forEach(el => el.innerHTML = `<div class="empty-state">目前沒有進行中的場次。</div>`);
+    return;
+  }
+  try {
+    allChallenges = await SessionStore.loadAllChallenges(activeSession.id);
+  } catch(e){
+    [scenarioEl, top3El, hrEl, indivEl].forEach(el =>
+      el.innerHTML = `<div class="error-state">⚠ 讀取失敗（${e && e.message ? e.message : '未知錯誤'}）</div>`);
+    return;
+  }
+  if(allChallenges.length === 0){
+    [scenarioEl, top3El, hrEl, indivEl].forEach(el => el.innerHTML = `<div class="empty-state">本場次目前尚無學員提交成績。</div>`);
+    return;
+  }
+  const stats = SessionStore.computeStats(allChallenges);
+  renderScenarioAnalysis(stats.scenarioStats);
+  renderTop3(stats.errorConceptResult, stats.top3MinSample);
+  renderHighRisk(stats.highRiskResult);
+  renderIndividual(allChallenges);
+}
+
+function renderScenarioAnalysis(scenarioStats){
+  const el = document.getElementById('scenarioAnalysisContent');
+  const keys = Object.keys(scenarioStats);
+  if(keys.length === 0){ el.innerHTML = `<div class="empty-state">尚無資料。</div>`; return; }
+  el.innerHTML = keys.map(scenarioId => {
+    const s = scenarioStats[scenarioId];
+    const errorRate = s.completedCount > 0 ? s.incorrectCount / s.completedCount : 0;
+    const topWrong = Object.entries(s.wrongAnswerTally).sort((a,b) => b[1]-a[1])[0];
+    return `
+      <div class="scenario-row">
+        <div class="sr-h"><span>${escapeHtml(s.alarmName)}</span><span>${fmtPct(errorRate)} 錯誤率</span></div>
+        <div class="sr-text">${escapeHtml(s.scenarioText || '（無文字情境，依畫面圖示判讀）')}</div>
+        <div class="sr-stats">
+          <span>被分配：<b>${s.assignedCount}</b></span>
+          <span>已完成：<b>${s.completedCount}</b></span>
+          <span>正確：<b>${s.correctCount}</b></span>
+          <span>錯誤：<b>${s.incorrectCount}</b></span>
+          <span>逾時：<b>${s.timeoutCount}</b></span>
         </div>
-        <div class="rank-score">${entry.totalScore ?? 0}</div>
-        ${isTeacherLoggedIn ? '<button class="delete-btn" title="刪除這筆紀錄">🗑</button>' : ''}
-        <div class="rank-chevron">▶</div>`;
-      const detail = document.createElement('div');
-      detail.className = 'rank-detail';
-      detail.innerHTML = buildDetailHtml(entry);
-      row.addEventListener('click', () => {
-        const showing = detail.classList.toggle('show');
-        row.classList.toggle('expanded', showing);
-      });
-      const delBtn = row.querySelector('.delete-btn');
-      if(delBtn){
-        delBtn.addEventListener('click', async (ev) => {
-          ev.stopPropagation();
-          if(!confirm(`確定要刪除「${entry.name || '未具名學員'}」這筆成績嗎？此動作無法復原。`)) return;
-          try {
-            await db.collection('leaderboard').doc(entry._id).delete();
-            loadLeaderboard();
-          } catch(e){
-            alert('刪除失敗：' + (e && e.message ? e.message : '未知錯誤'));
-          }
-        });
-      }
-      content.appendChild(row);
-      content.appendChild(detail);
+        ${topWrong ? `<div class="sr-wrong">最常見錯誤：${escapeHtml(topWrong[0])}（${topWrong[1]} 次）</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function renderTop3(list, minSample){
+  const el = document.getElementById('top3Content');
+  if(list.length === 0){
+    el.innerHTML = `<div class="empty-state">目前樣本數不足（需至少 ${minSample} 個有效作答才會列入）。</div>`;
+    return;
+  }
+  el.innerHTML = list.map((r, i) => `
+    <div class="card">
+      <div class="card-h">${i+1}. ${escapeHtml(r.label)}</div>
+      <div class="card-rate">${fmtPct(r.errorRate)}</div>
+      <div class="card-meta">${r.erroredAttemptCount} / ${r.applicableAttemptCount} 次有效作答曾出現此錯誤（原始事件共 ${r.eventCount} 次）</div>
+      <div class="card-desc">${escapeHtml((ERROR_CONCEPTS[r.concept]||{}).description || '')}</div>
+    </div>`).join('');
+}
+
+function renderHighRisk(list){
+  const el = document.getElementById('highRiskContent');
+  if(list.length === 0){
+    el.innerHTML = `<div class="empty-state">目前尚未發生任何已標記的高風險操作。</div>`;
+    return;
+  }
+  el.innerHTML = list.map(r => `
+    <div class="card highrisk">
+      <div class="card-h">🚫 ${escapeHtml(r.action)}</div>
+      <div class="card-rate">${r.uniqueLearnerCount} 位學員</div>
+      <div class="card-meta">共 ${r.questionCount} 題次曾發生（原始事件 ${r.eventCount} 次，同一題重複操作僅計 1 次）</div>
+    </div>`).join('');
+}
+
+function renderIndividual(challenges){
+  const el = document.getElementById('individualContent');
+  const sorted = challenges.slice().sort((a,b) => (b.totalScore||0) - (a.totalScore||0));
+  el.innerHTML = '';
+  sorted.forEach(ch => {
+    const row = document.createElement('div');
+    row.className = 'rank-row';
+    row.innerHTML = `
+      <div class="rank-info">
+        <div class="rn-name">${escapeHtml(ch.playerName || '未具名學員')}</div>
+        <div class="rn-meta">${fmtTime(ch.createdAt)} ・ 共 ${(ch.questions||[]).length} 關</div>
+      </div>
+      <div class="rank-score">${ch.totalScore ?? 0}</div>
+      <div class="rank-chevron">▶</div>`;
+    const detail = document.createElement('div');
+    detail.className = 'rank-detail';
+    detail.innerHTML = buildChallengeDetailHtml(ch);
+    row.addEventListener('click', () => {
+      const showing = detail.classList.toggle('show');
+      row.classList.toggle('expanded', showing);
+    });
+    el.appendChild(row);
+    el.appendChild(detail);
+  });
+}
+
+function buildChallengeDetailHtml(ch){
+  const qs = ch.questions || [];
+  if(qs.length === 0) return `<div class="round-item">無詳細紀錄</div>`;
+  return qs.map((q, i) => {
+    const events = q.errorEvents || [];
+    const mistakesHtml = events.length
+      ? `<div class="r-mistakes-h">⚠ 誤選／誤按紀錄（共 ${events.length} 次）</div>` +
+        events.map(m => `<div class="r-mistake${m.highRisk ? ' highrisk' : ''}">${m.highRisk ? '🚫 ' : ''}${escapeHtml(m.selectedAction)}（${m.penalty}分）</div>`).join('')
+      : `<div class="no-mistakes">✅ 全程無誤選</div>`;
+    return `
+      <div class="round-item">
+        <div class="rh"><span class="rt">第 ${i+1} 關．${escapeHtml(q.alarmName||'')}</span><span class="rs">${q.roundScore ?? 0} 分</span></div>
+        <div class="r-status ${q.completed ? '' : 'timeout'}">${q.completed ? '✅ 已完成' : '⏱ 時間到，未完成'}</div>
+        <div class="r-answer"><b>情境：</b>${escapeHtml(q.scenarioText || '（無文字情境，依畫面圖示判讀）')}<br><b>正確處置：</b>${escapeHtml(q.teachingPoint||'')}</div>
+        ${mistakesHtml}
+      </div>`;
+  }).join('');
+}
+
+sessionManagerBtn.addEventListener('click', openSessionManager);
+
+async function openSessionManager(){
+  sessionPanel.style.display = 'flex';
+  sessionPanel.innerHTML = `<div class="session-box"><div class="loading"><div class="spin">⏳</div>讀取場次列表中…</div></div>`;
+  let sessions;
+  try {
+    sessions = await SessionStore.listAllSessions();
+  } catch(e){
+    sessionPanel.innerHTML = `<div class="session-box"><button class="close-panel-btn" id="closeSessPanel">✕</button><div class="error-state">讀取失敗：${e && e.message ? e.message : '未知錯誤'}</div></div>`;
+    document.getElementById('closeSessPanel').addEventListener('click', () => sessionPanel.style.display = 'none');
+    return;
+  }
+  renderSessionListPanel(sessions);
+}
+
+function renderSessionListPanel(sessions){
+  const statusLabel = { draft:'草稿', active:'進行中', closed:'已結束' };
+  sessionPanel.innerHTML = `
+    <div class="session-box">
+      <button class="close-panel-btn" id="closeSessPanel">✕</button>
+      <h3>場次管理</h3>
+      <button class="pill-btn" id="newSessionBtn" style="margin-bottom:14px;">＋ 建立新場次</button>
+      <div id="sessionListWrap">
+        ${sessions.length === 0 ? '<div class="empty-state">尚未建立任何場次。</div>' : sessions.map(s => `
+          <div class="session-list-item" data-id="${s.id}">
+            <span class="status-badge ${s.status}">${statusLabel[s.status]}</span>
+            <span class="sname">${escapeHtml(s.sessionName)}</span>
+            ${s.status === 'draft' ? `<button data-action="edit" data-id="${s.id}">編輯</button><button class="primary" data-action="activate" data-id="${s.id}">啟用</button>` : ''}
+            ${s.status === 'active' ? `<button data-action="close" data-id="${s.id}">結束場次</button>` : ''}
+            ${s.status === 'closed' ? `<button data-action="view" data-id="${s.id}">查看統計</button>` : ''}
+          </div>`).join('')}
+      </div>
+    </div>`;
+  document.getElementById('closeSessPanel').addEventListener('click', () => sessionPanel.style.display = 'none');
+  document.getElementById('newSessionBtn').addEventListener('click', () => openConfigForm(null));
+  sessionPanel.querySelectorAll('[data-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id, action = btn.dataset.action;
+      const sess = sessions.find(s => s.id === id);
+      if(action === 'edit') openConfigForm(sess);
+      else if(action === 'activate') confirmActivate(sess, sessions);
+      else if(action === 'close') confirmCloseActive(sess);
+      else if(action === 'view') { sessionPanel.style.display = 'none'; viewClosedSessionStats(sess); }
+    });
+  });
+}
+
+function confirmActivate(sess, sessions){
+  const hasOtherActive = sessions.some(s => s.status === 'active' && s.id !== sess.id);
+  const validation = validateConfig(sess.config);
+  if(!validation.ok){
+    alert('這個場次的設定尚未通過驗證，請先編輯修正：\n' + validation.message);
+    return;
+  }
+  const msg = hasOtherActive
+    ? '目前已有進行中的班級場次，是否先結束目前場次並啟用新的場次？'
+    : `確定要啟用「${sess.sessionName}」這個場次嗎？`;
+  showConfirm(msg, async () => {
+    try {
+      await SessionStore.activateSession(sess.id);
+      hideConfirm();
+      await openSessionManager();
+      await loadEverything();
+    } catch(e){
+      hideConfirm();
+      alert('啟用失敗：' + (e && e.message ? e.message : '未知錯誤'));
+    }
+  });
+}
+
+function confirmCloseActive(sess){
+  showConfirm(`確定要結束「${sess.sessionName}」這個場次嗎？結束後學員將無法再進行正式挑戰，直到您啟用下一個場次。`, async () => {
+    try {
+      await SessionStore.closeActiveSession(sess.id);
+      hideConfirm();
+      await openSessionManager();
+      await loadEverything();
+    } catch(e){
+      hideConfirm();
+      alert('結束場次失敗：' + (e && e.message ? e.message : '未知錯誤'));
+    }
+  });
+}
+
+function showConfirm(message, onConfirm){
+  confirmOverlay.style.display = 'flex';
+  confirmOverlay.innerHTML = `
+    <div class="confirm-box">
+      <p>${escapeHtml(message)}</p>
+      <div class="form-actions">
+        <button id="confirmYes">確定</button>
+        <button class="cancel-btn" id="confirmNo">取消</button>
+      </div>
+    </div>`;
+  document.getElementById('confirmYes').addEventListener('click', onConfirm);
+  document.getElementById('confirmNo').addEventListener('click', hideConfirm);
+}
+function hideConfirm(){ confirmOverlay.style.display = 'none'; confirmOverlay.innerHTML = ''; }
+
+function validateConfig(config){
+  const core = config.selectedCoreAlarmIds || [];
+  const rand = config.selectedRandomAlarmIds || [];
+  const total = config.totalQuestions || 0;
+  if(core.length > total){
+    return { ok:false, message:`已選擇 ${core.length} 個核心警報，但正式挑戰目前僅設定 ${total} 題。請減少核心題或增加挑戰題數。` };
+  }
+  const randomNeeded = total - core.length;
+  if(randomNeeded > 0 && rand.length < randomNeeded){
+    return { ok:false, message:`目前隨機題池不足以完成本次正式挑戰，請增加隨機警報或減少正式挑戰題數。` };
+  }
+  return { ok:true, message:`本次正式挑戰：${core.length} 題核心 ＋ ${randomNeeded} 題隨機 ＝ ${total} 題` };
+}
+
+function openConfigForm(existingSession){
+  const isEdit = !!existingSession;
+  const cfg = isEdit ? existingSession.config : {
+    totalQuestions: 5, questionTimeLimit: 60, selectedCoreAlarmIds: [], selectedRandomAlarmIds: []
+  };
+  const allAlarms = Object.values(alarmDefs).filter(a => a.enabled);
+  if(!isEdit){
+    allAlarms.forEach(a => {
+      if(a.eligibleAsCore) cfg.selectedCoreAlarmIds.push(a.alarmId);
+      else cfg.selectedRandomAlarmIds.push(a.alarmId);
     });
   }
 
-  function buildDetailHtml(entry){
-    const rounds = entry.rounds || [];
-    if(rounds.length === 0) return `<div class="round-item">無詳細紀錄</div>`;
-    return rounds.map((r, i) => {
-      const mistakes = r.mistakes || [];
-      const mistakesHtml = mistakes.length
-        ? `<div class="r-mistakes-h">⚠ 誤選紀錄（共 ${mistakes.length} 次）</div>` +
-          mistakes.map(m => `<div class="r-mistake">${escapeHtml(m.label)}（${m.penalty}分）</div>`).join('')
-        : `<div class="no-mistakes">✅ 全程無誤選</div>`;
-      return `
-        <div class="round-item">
-          <div class="rh"><span class="rt">第 ${i+1} 關．${escapeHtml(r.title||'')}</span><span class="rs">${r.roundScore ?? 0} 分</span></div>
-          <div class="r-status ${r.completed ? '' : 'timeout'}">${r.completed ? '✅ 已完成' : '⏱ 時間到，未完成'}</div>
-          ${mistakesHtml}
-        </div>`;
-    }).join('');
-  }
+  sessionPanel.innerHTML = `
+    <div class="session-box">
+      <button class="close-panel-btn" id="closeConfigBtn">✕</button>
+      <h3>${isEdit ? '編輯場次' : '建立新場次'}</h3>
+      <div class="config-form">
+        <label>場次名稱</label>
+        <input type="text" id="cfgName" value="${escapeHtml(isEdit ? existingSession.sessionName : '')}" placeholder="例如：114年8月 CRRT 訓練班">
 
-  function escapeHtml(s){
-    const div = document.createElement('div');
-    div.textContent = s;
-    return div.innerHTML;
-  }
+        <label>正式挑戰題數（3–10 題）</label>
+        <input type="range" id="cfgTotal" min="3" max="10" value="${cfg.totalQuestions}">
+        <div class="range-value" id="cfgTotalVal">${cfg.totalQuestions} 題</div>
 
-  loadLeaderboard();
+        <label>每題限時（秒）</label>
+        <input type="number" id="cfgTimeLimit" min="10" max="600" value="${cfg.questionTimeLimit}">
+
+        <label>核心警報（每位學員一定會遇到一次）</label>
+        <div class="alarm-check-list" id="coreList">
+          ${allAlarms.map(a => `
+            <label class="alarm-check-row">
+              <input type="checkbox" data-alarm="${a.alarmId}" class="coreCheck" ${cfg.selectedCoreAlarmIds.includes(a.alarmId) ? 'checked' : ''}>
+              ${escapeHtml(a.title)}
+            </label>`).join('')}
+        </div>
+
+        <label>隨機題池（用於補足剩餘題目）</label>
+        <div class="alarm-check-list" id="randomList">
+          ${allAlarms.map(a => `
+            <label class="alarm-check-row">
+              <input type="checkbox" data-alarm="${a.alarmId}" class="randomCheck" ${cfg.selectedRandomAlarmIds.includes(a.alarmId) ? 'checked' : ''}>
+              ${escapeHtml(a.title)}
+            </label>`).join('')}
+        </div>
+
+        <div class="config-summary" id="cfgSummary"></div>
+
+        <div class="form-actions">
+          <button class="save-btn" id="cfgSaveBtn">儲存${isEdit ? '' : '（草稿）'}</button>
+          <button class="cancel-btn" id="cfgCancelBtn">取消</button>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('closeConfigBtn').addEventListener('click', () => openSessionManager());
+  document.getElementById('cfgCancelBtn').addEventListener('click', () => openSessionManager());
+
+  const totalEl = document.getElementById('cfgTotal');
+  const totalValEl = document.getElementById('cfgTotalVal');
+  totalEl.addEventListener('input', () => { totalValEl.textContent = totalEl.value + ' 題'; refreshSummary(); });
+
+  document.querySelectorAll('.coreCheck').forEach(cb => cb.addEventListener('change', () => {
+    if(cb.checked){
+      const randCb = document.querySelector(`.randomCheck[data-alarm="${cb.dataset.alarm}"]`);
+      if(randCb) randCb.checked = false;
+    }
+    refreshSummary();
+  }));
+  document.querySelectorAll('.randomCheck').forEach(cb => cb.addEventListener('change', () => {
+    if(cb.checked){
+      const coreCb = document.querySelector(`.coreCheck[data-alarm="${cb.dataset.alarm}"]`);
+      if(coreCb) coreCb.checked = false;
+    }
+    refreshSummary();
+  }));
+
+  function currentFormConfig(){
+    return {
+      totalQuestions: parseInt(totalEl.value, 10),
+      questionTimeLimit: parseInt(document.getElementById('cfgTimeLimit').value, 10) || 60,
+      selectedCoreAlarmIds: [...document.querySelectorAll('.coreCheck:checked')].map(cb => cb.dataset.alarm),
+      selectedRandomAlarmIds: [...document.querySelectorAll('.randomCheck:checked')].map(cb => cb.dataset.alarm)
+    };
+  }
+  function refreshSummary(){
+    const v = validateConfig(currentFormConfig());
+    const el = document.getElementById('cfgSummary');
+    el.className = 'config-summary ' + (v.ok ? 'ok' : 'error');
+    el.textContent = v.message;
+    document.getElementById('cfgSaveBtn').disabled = !v.ok;
+  }
+  refreshSummary();
+
+  document.getElementById('cfgSaveBtn').addEventListener('click', async () => {
+    const name = document.getElementById('cfgName').value.trim() || '未命名場次';
+    const formCfg = currentFormConfig();
+    const v = validateConfig(formCfg);
+    if(!v.ok) return;
+    try {
+      if(isEdit){
+        await SessionStore.updateDraftConfig(existingSession.id, formCfg);
+      } else {
+        await SessionStore.createDraftSession(name, formCfg);
+      }
+      await openSessionManager();
+    } catch(e){
+      alert('儲存失敗：' + (e && e.message ? e.message : '未知錯誤'));
+    }
+  });
+}
+
+async function viewClosedSessionStats(sess){
+  document.getElementById('teacherSections').style.display = 'block';
+  document.getElementById('headerSub').textContent = `歷史場次：${sess.sessionName}（唯讀）`;
+  const scenarioEl = document.getElementById('scenarioAnalysisContent');
+  const top3El = document.getElementById('top3Content');
+  const hrEl = document.getElementById('highRiskContent');
+  const indivEl = document.getElementById('individualContent');
+  [scenarioEl, top3El, hrEl, indivEl].forEach(el => el.innerHTML = `<div class="loading"><div class="spin">⏳</div>讀取中…</div>`);
+  try {
+    const challenges = await SessionStore.loadAllChallenges(sess.id);
+    if(challenges.length === 0){
+      [scenarioEl, top3El, hrEl, indivEl].forEach(el => el.innerHTML = `<div class="empty-state">此場次沒有學員提交成績。</div>`);
+      return;
+    }
+    const stats = SessionStore.computeStats(challenges);
+    renderScenarioAnalysis(stats.scenarioStats);
+    renderTop3(stats.errorConceptResult, stats.top3MinSample);
+    renderHighRisk(stats.highRiskResult);
+    renderIndividual(challenges);
+  } catch(e){
+    [scenarioEl, top3El, hrEl, indivEl].forEach(el => el.innerHTML = `<div class="error-state">讀取失敗：${e && e.message ? e.message : '未知錯誤'}</div>`);
+  }
+}
+
+let legacyEntries = [];
+async function loadLegacyLeaderboard(){
+  const content = document.getElementById('legacyContent');
+  const filterBar = document.getElementById('legacyFilterBar');
+  content.innerHTML = `<div class="loading"><div class="spin">⏳</div>讀取中…</div>`;
+  try {
+    const snapshot = await db.collection('leaderboard').orderBy('totalScore', 'desc').get();
+    legacyEntries = [];
+    snapshot.forEach(doc => legacyEntries.push(Object.assign({ _id: doc.id }, doc.data())));
+    filterBar.style.display = legacyEntries.length > 5 ? 'flex' : 'none';
+    renderLegacyList('');
+  } catch(e){
+    content.innerHTML = `<div class="error-state">⚠ 讀取失敗（${e && e.message ? e.message : '未知錯誤'}）</div>`;
+  }
+}
+document.getElementById('legacyFilterInput').addEventListener('input', (e) => renderLegacyList(e.target.value.trim()));
+
+function renderLegacyList(filterText){
+  const content = document.getElementById('legacyContent');
+  const filtered = filterText
+    ? legacyEntries.filter(e => (e.name||'').toLowerCase().includes(filterText.toLowerCase()))
+    : legacyEntries;
+  if(legacyEntries.length === 0){
+    content.innerHTML = `<div class="empty-state">目前沒有舊版資料。</div>`;
+    return;
+  }
+  if(filtered.length === 0){
+    content.innerHTML = `<div class="empty-state">找不到符合的學員姓名。</div>`;
+    return;
+  }
+  content.innerHTML = '';
+  filtered.forEach((entry) => {
+    const rank = legacyEntries.indexOf(entry) + 1;
+    const row = document.createElement('div');
+    row.className = 'rank-row';
+    row.innerHTML = `
+      <div class="rank-num">${rank}</div>
+      <div class="rank-info">
+        <div class="rn-name">${escapeHtml(entry.name || '未具名學員')}</div>
+        <div class="rn-meta">${fmtTime(entry.timestamp)} ・ 共 ${(entry.rounds||[]).length} 關</div>
+      </div>
+      <div class="rank-score">${entry.totalScore ?? 0}</div>
+      ${isTeacherLoggedIn ? '<button class="delete-btn" title="刪除這筆紀錄" style="flex-shrink:0;width:30px;height:30px;border-radius:8px;border:1px solid rgba(229,72,77,0.3);background:rgba(229,72,77,0.08);color:var(--alarm);cursor:pointer;">🗑</button>' : ''}
+      <div class="rank-chevron">▶</div>`;
+    const detail = document.createElement('div');
+    detail.className = 'rank-detail';
+    detail.innerHTML = buildLegacyDetailHtml(entry);
+    row.addEventListener('click', (ev) => {
+      if(ev.target.closest('.delete-btn')) return;
+      const showing = detail.classList.toggle('show');
+      row.classList.toggle('expanded', showing);
+    });
+    const delBtn = row.querySelector('.delete-btn');
+    if(delBtn){
+      delBtn.addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        if(!confirm(`確定要刪除「${entry.name || '未具名學員'}」這筆舊版成績嗎？此動作無法復原。`)) return;
+        try {
+          await db.collection('leaderboard').doc(entry._id).delete();
+          loadLegacyLeaderboard();
+        } catch(e){
+          alert('刪除失敗：' + (e && e.message ? e.message : '未知錯誤'));
+        }
+      });
+    }
+    content.appendChild(row);
+    content.appendChild(detail);
+  });
+}
+
+function buildLegacyDetailHtml(entry){
+  const rounds = entry.rounds || [];
+  if(rounds.length === 0) return `<div class="round-item">無詳細紀錄</div>`;
+  return rounds.map((r, i) => {
+    const mistakes = r.mistakes || [];
+    const mistakesHtml = mistakes.length
+      ? `<div class="r-mistakes-h">⚠ 誤選紀錄（共 ${mistakes.length} 次）</div>` +
+        mistakes.map(m => `<div class="r-mistake">${escapeHtml(m.label)}（${m.penalty}分）</div>`).join('')
+      : `<div class="no-mistakes">✅ 全程無誤選</div>`;
+    const answerHtml = (r.cue || r.resolveText)
+      ? `<div class="r-answer"><b>情境：</b>${escapeHtml(r.cue||'')}<br><b>正確處置：</b>${escapeHtml(r.resolveText||'')}</div>` : '';
+    return `
+      <div class="round-item">
+        <div class="rh"><span class="rt">第 ${i+1} 關．${escapeHtml(r.title||'')}</span><span class="rs">${r.roundScore ?? 0} 分</span></div>
+        <div class="r-status ${r.completed ? '' : 'timeout'}">${r.completed ? '✅ 已完成' : '⏱ 時間到，未完成'}</div>
+        ${answerHtml}
+        ${mistakesHtml}
+      </div>`;
+  }).join('');
+}
+
+loadEverything();
 </script>
 
 </body>
